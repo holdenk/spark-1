@@ -48,8 +48,7 @@ import org.apache.spark.deploy.{SparkHadoopUtil}
 import org.apache.spark.util.Utils
 
 class Client(val hadoopConf: Configuration,
-                            toArgs: YarnResourceCapacity => ClientArguments )
-  extends Logging {
+             toArgs: YarnResourceCapacity => ClientArguments ) extends Logging {
 
   import Client._
 
@@ -229,8 +228,7 @@ class Client(val hadoopConf: Configuration,
    */
   def createApplicationSubmissionContext(args: ClientArguments,
                                          newApp: YarnClientApplication,
-                                         containerContext: ContainerLaunchContext):
-                                         ApplicationSubmissionContext = {
+                                         containerContext: ContainerLaunchContext): ApplicationSubmissionContext = {
     val appContext = newApp.getApplicationSubmissionContext
     appContext.setApplicationName(args.appName)
     appContext.setQueue(args.amQueue)
@@ -496,8 +494,7 @@ class Client(val hadoopConf: Configuration,
    * This sets up the launch environment, java options, and the command for launching the AM.
    */
   private def createContainerLaunchContext(args:           ClientArguments,
-                                           newAppResponse: GetNewApplicationResponse)
-    : ContainerLaunchContext = {
+                                           newAppResponse: GetNewApplicationResponse) : ContainerLaunchContext = {
     logInfo("Setting up container launch context for our AM")
 
     val sparkConf = args.sparkConf
@@ -864,8 +861,7 @@ object Client extends Logging {
    * Populate the classpath entry in the given environment map with any application
    * classpath specified through the Hadoop and Yarn configurations.
    */
-  private[yarn] def populateHadoopClasspath(conf: Configuration, env: HashMap[String, String])
-    : Unit = {
+  private[yarn] def populateHadoopClasspath(conf: Configuration, env: HashMap[String, String]) : Unit = {
     val classPathElementsToAdd = getYarnAppClasspath(conf) ++ getMRAppClasspath(conf)
     for (c <- classPathElementsToAdd.flatten) {
       YarnSparkHadoopUtil.addPathToEnvironment(env, Environment.CLASSPATH.name, c.trim)
@@ -1129,5 +1125,6 @@ object Client extends Logging {
   def buildPath(components: String*): String = {
     components.mkString(Path.SEPARATOR)
   }
+
 
 }
