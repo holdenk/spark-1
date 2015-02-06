@@ -540,6 +540,8 @@ class Client(val hadoopConf: Configuration,
       // In our expts, using (default) throughput collector has severe perf ramifications in
       // multi-tenant machines
       javaOpts += "-XX:+UseConcMarkSweepGC"
+      javaOpts += "-XX:MaxTenuringThreshold=31"
+      javaOpts += "-XX:SurvivorRatio=8"
       javaOpts += "-XX:+CMSIncrementalMode"
       javaOpts += "-XX:+CMSIncrementalPacing"
       javaOpts += "-XX:CMSIncrementalDutyCycleMin=0"
