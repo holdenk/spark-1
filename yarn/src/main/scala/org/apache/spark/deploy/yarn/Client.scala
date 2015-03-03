@@ -1118,7 +1118,8 @@ object Client extends Logging {
     if (isDriver) {
       conf.getBoolean("spark.driver.userClassPathFirst", false)
     } else {
-      conf.getBoolean("spark.executor.userClassPathFirst", false)
+      conf.getBoolean("spark.executor.userClassPathFirst",
+        conf.getBoolean("spark.files.userClassPathFirst", false))
     }
   }
 
