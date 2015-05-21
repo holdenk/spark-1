@@ -1,0 +1,3 @@
+Hi friend Alpine developer! The sbt build has some interesting interactions with deps which cause problems so we need to use the maven build.
+ e.g.: ./build/mvn -Pyarn -Phive -Phive-thriftserver -Dhadoop.version=2.3.0-cdh5.1.2 clean package -DskipTests -Phadoop-2.3
+ 
