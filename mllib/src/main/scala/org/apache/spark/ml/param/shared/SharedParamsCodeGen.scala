@@ -21,6 +21,8 @@ import java.io.PrintWriter
 
 import scala.reflect.ClassTag
 
+import org.apache.spark.mllib.linalg.Vector
+
 /**
  * Code generator for shared params (sharedParams.scala). Run under the Spark folder with
  * {{{
@@ -58,7 +60,12 @@ private[shared] object SharedParamsCodeGen {
         " For alpha = 0, the penalty is an L2 penalty. For alpha = 1, it is an L1 penalty.",
         isValid = "ParamValidators.inRange(0, 1)"),
       ParamDesc[Double]("tol", "the convergence tolerance for iterative algorithms"),
-      ParamDesc[Double]("stepSize", "Step size to be used for each iteration of optimization."))
+      ParamDesc[Double]("stepSize", "Step size to be used for each iteration of optimization."),
+      ParamDesc[Vector]("initialWeights", "The initial weights to be used when training the model."+
+        " Default is dependent on the model, but frequently will be a vector of 0s. Should include"+
+        " the intercept if model has an intercept. If invalid (e.g. not correct size) uses model's"+
+        " defaults.")
+      )
 
     val code = genSharedParams(params)
     val file = "src/main/scala/org/apache/spark/ml/param/shared/sharedParams.scala"
@@ -103,6 +110,7 @@ private[shared] object SharedParamsCodeGen {
         case _ if c == classOf[Double] => "Double"
         case _ if c == classOf[Boolean] => "Boolean"
         case _ if c == classOf[String] => "String"
+        case _ if c = classOf[Vector] => "Vector"
         case _ if c.isArray => s"Array[${getTypeString(c.getComponentType)}]"
       }
     }
