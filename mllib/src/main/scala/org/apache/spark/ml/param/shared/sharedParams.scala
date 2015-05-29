@@ -294,19 +294,4 @@ private[ml] trait HasStepSize extends Params {
   /** @group getParam */
   final def getStepSize: Double = $(stepSize)
 }
-
-/**
- * (private[ml]) Trait for shared param initialWeights.
- */
-private[ml] trait HasInitialWeights extends Params {
-
-  /**
-   * Param for The initial weights to be used when training the model. Default is dependent on the model, but frequently will be a vector of 0s. Should include the intercept if model has an intercept. If invalid (e.g. not correct size) uses model's defaults..
-   * @group param
-   */
-  final val initialWeights: VectorParam = new VectorParam(this, "initialWeights", "The initial weights to be used when training the model. Default is dependent on the model, but frequently will be a vector of 0s. Should include the intercept if model has an intercept. If invalid (e.g. not correct size) uses model's defaults.")
-
-  /** @group getParam */
-  final def getInitialWeights: Vector = $(initialWeights)
-}
 // scalastyle:on
