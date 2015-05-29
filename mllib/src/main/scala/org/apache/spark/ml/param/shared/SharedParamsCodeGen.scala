@@ -92,6 +92,7 @@ private[shared] object SharedParamsCodeGen {
         case _ if c == classOf[Float] => "FloatParam"
         case _ if c == classOf[Double] => "DoubleParam"
         case _ if c == classOf[Boolean] => "BooleanParam"
+        case _ if c == classOf[Vector] => "VectorParam"
         case _ if c.isArray && c.getComponentType == classOf[String] => s"StringArrayParam"
         case _ => s"Param[${getTypeString(c)}]"
       }
@@ -110,7 +111,7 @@ private[shared] object SharedParamsCodeGen {
         case _ if c == classOf[Double] => "Double"
         case _ if c == classOf[Boolean] => "Boolean"
         case _ if c == classOf[String] => "String"
-        case _ if c = classOf[Vector] => "Vector"
+        case _ if c == classOf[Vector] => "Vector"
         case _ if c.isArray => s"Array[${getTypeString(c.getComponentType)}]"
       }
     }
