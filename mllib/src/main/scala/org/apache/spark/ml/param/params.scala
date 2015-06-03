@@ -26,6 +26,7 @@ import scala.collection.JavaConverters._
 
 import org.apache.spark.annotation.{DeveloperApi, Experimental}
 import org.apache.spark.ml.util.Identifiable
+import org.apache.spark.mllib.linalg.Vector
 
 /**
  * :: DeveloperApi ::
@@ -262,6 +263,21 @@ class BooleanParam(parent: String, name: String, doc: String) // No need for isV
 
   override def w(value: Boolean): ParamPair[Boolean] = super.w(value)
 }
+
+/**
+ * :: DeveloperApi ::
+ * Specialized version of [[Param[Vector]]] for Java.
+ */
+@DeveloperApi
+class VectorParam(parent: Params, name: String, doc: String, isValid: Vector => Boolean)
+  extends Param[Vector](parent, name, doc, isValid) {
+
+  def this(parent: Params, name: String, doc: String) =
+    this(parent, name, doc, ParamValidators.alwaysTrue)
+
+  override def w(value: Vector): ParamPair[Vector] = super.w(value)
+}
+
 
 /**
  * :: DeveloperApi ::
