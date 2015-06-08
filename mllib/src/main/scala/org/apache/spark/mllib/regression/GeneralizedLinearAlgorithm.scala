@@ -18,6 +18,7 @@
 package org.apache.spark.mllib.regression
 
 import org.apache.spark.annotation.DeveloperApi
+import org.apache.spark.ml.HasWeights
 import org.apache.spark.mllib.feature.StandardScaler
 import org.apache.spark.{Logging, SparkException}
 import org.apache.spark.rdd.RDD
@@ -37,7 +38,7 @@ import org.apache.spark.storage.StorageLevel
  */
 @DeveloperApi
 abstract class GeneralizedLinearModel(val weights: Vector, val intercept: Double)
-  extends Serializable {
+  extends Serializable with HasWeights {
 
   /**
    * Predict the result given a data point and the weights learned.
@@ -81,6 +82,10 @@ abstract class GeneralizedLinearModel(val weights: Vector, val intercept: Double
    */
   override def toString: String = {
     s"${this.getClass.getName}: intercept = ${intercept}, numFeatures = ${weights.size}"
+  }
+
+  override private[spark] def getWeightsWithIntercept: Vector = {
+    appendBias(weights, intercept)
   }
 }
 

@@ -67,6 +67,20 @@ private[ml] trait CrossValidatorParams extends Params {
   def getEvaluator: Evaluator = $(evaluator)
 
   /**
+   * Param for if we should use the previous models weights when
+   * as initial weights when training a new model. The model must
+   * implement HasWeights and the trainer must implement HasInitialWeights
+   * Default: false
+   * @group param
+   */
+  val usePreviousWeights = new BooleanParam(this, "usePreviousWeights", "if we should use the weights from previous models as initial weights for new models")
+
+  /**@group getParam */
+  def getUsePreviousWeights: Boolean = $(usePreviousWeights)
+
+  setDefault(usePreviousWeights -> false)
+
+  /**
    * Param for number of folds for cross validation.  Must be >= 2.
    * Default: 3
    * @group param
@@ -104,6 +118,10 @@ class CrossValidator(override val uid: String) extends Estimator[CrossValidatorM
   /** @group setParam */
   def setNumFolds(value: Int): this.type = set(numFolds, value)
 
+  /** @group setParam */
+  def setUsePreviousWeights(value: Boolean): this.type = set(usePreviousWeights, value)
+
+
   override def fit(dataset: DataFrame): CrossValidatorModel = {
     val schema = dataset.schema
     transformSchema(schema, logging = true)
@@ -130,15 +148,26 @@ class CrossValidator(override val uid: String) extends Estimator[CrossValidatorM
       val models =  est.fit(trainingDataset, epm).asInstanceOf[Seq[Model[_]]]
       trainingDataset.unpersist()
       var i = 0
+      val stepMetrics = models.map(m => eval.evaluate(m.transform(validationDataset, epm(i)))).toArray
       while (i < numModels) {
         // TODO: duplicate evaluator to take extra params from input
-        val metric = eval.evaluate(models(i).transform(validationDataset, epm(i)))
+        val metric = stepMetrics(i)
         logDebug(s"Got metric $metric for model trained with ${epm(i)}.")
         metrics(i) += metric
         i += 1
       }
       validationDataset.unpersist()
-      None: Option[(Double, Vector)]
+      if (getUsePreviousWeights) {
+        val modelWeights = models.asInstanceOf[Seq[HasWeights]].map(_.getWeightsWithIntercept())
+        val bestFromStep = stepMetrics.zip(modelWeights).maxBy(_._1)
+        bestWeights match {
+          case None => Some(bestFromStep)
+          case Some((m, _)) if (m < bestFromStep._1) => Some(bestFromStep)
+          case _ => bestWeights
+        }
+      } else {
+        None: Option[(Double, Vector)]
+      }
     }
     f2jBLAS.dscal(numModels, 1.0 / $(numFolds), metrics, 1)
     logInfo(s"Average cross-validation metrics: ${metrics.toSeq}")

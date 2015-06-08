@@ -255,17 +255,17 @@ object MLUtils {
   }
 
   /**
-   * Returns a new vector with `1.0` (bias) appended to the input vector.
+   * Returns a new vector with `bias` (default 1.0) appended to the input vector.
    */
-  def appendBias(vector: Vector): Vector = {
+  def appendBias(vector: Vector, bias: Double = 1.0): Vector = {
     val vector1 = vector.toBreeze match {
-      case dv: BDV[Double] => BDV.vertcat(dv, new BDV[Double](Array(1.0)))
-      case sv: BSV[Double] => BSV.vertcat(sv, new BSV[Double](Array(0), Array(1.0), 1))
+      case dv: BDV[Double] => BDV.vertcat(dv, new BDV[Double](Array(bias)))
+      case sv: BSV[Double] => BSV.vertcat(sv, new BSV[Double](Array(0), Array(bias), 1))
       case v: Any => throw new IllegalArgumentException("Do not support vector type " + v.getClass)
     }
     Vectors.fromBreeze(vector1)
   }
- 
+
   /**
    * Returns the squared Euclidean distance between two vectors. The following formula will be used
    * if it does not introduce too much numerical error:
