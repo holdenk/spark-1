@@ -24,6 +24,7 @@ import breeze.optimize.{CachedDiffFunction, DiffFunction, LBFGS => BreezeLBFGS, 
 
 import org.apache.spark.{Logging, SparkException}
 import org.apache.spark.annotation.Experimental
+import org.apache.spark.ml.HasWeights
 import org.apache.spark.ml.param._
 import org.apache.spark.ml.param.shared._
 import org.apache.spark.ml.util.Identifiable
@@ -51,7 +52,7 @@ private[classification] trait LogisticRegressionParams extends ProbabilisticClas
 @Experimental
 class LogisticRegression(override val uid: String)
   extends ProbabilisticClassifier[Vector, LogisticRegression, LogisticRegressionModel]
-  with LogisticRegressionParams with Logging {
+  with LogisticRegressionParams with Logging with HasInitialWeights {
 
   def this() = this(Identifiable.randomUID("logreg"))
 
@@ -158,6 +159,8 @@ class LogisticRegression(override val uid: String)
       new BreezeOWLQN[Int, BDV[Double]]($(maxIter), 10, regParamL1Fun, $(tol))
     }
 
+    // TODO: code goes here.
+
     val initialWeightsWithIntercept =
       Vectors.zeros(if ($(fitIntercept)) numFeatures + 1 else numFeatures)
 
@@ -228,7 +231,11 @@ class LogisticRegressionModel private[ml] (
     val weights: Vector,
     val intercept: Double)
   extends ProbabilisticClassificationModel[Vector, LogisticRegressionModel]
-  with LogisticRegressionParams {
+  with LogisticRegressionParams with HasWeights {
+
+  override def getWeightsWithIntercept(): Vector = {
+    MLUtils.appendBias(weights, intercept)
+  }
 
   /** @group setParam */
   def setThreshold(value: Double): this.type = set(threshold, value)

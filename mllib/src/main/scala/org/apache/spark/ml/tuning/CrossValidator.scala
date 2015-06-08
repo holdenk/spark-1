@@ -141,7 +141,7 @@ class CrossValidator(override val uid: String) extends Estimator[CrossValidatorM
       bestWeights match {
         case None => {}
         case Some((_, w)) => {
-          epm.foreach(_.put(eval.getParam("asInitialWeights") -> w))
+          epm.foreach(_.put(eval.getParam("hasInitialWeights") -> w))
         }
       }
       // multi-model training

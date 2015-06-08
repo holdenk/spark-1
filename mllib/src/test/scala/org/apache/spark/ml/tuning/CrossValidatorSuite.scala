@@ -41,6 +41,15 @@ class CrossValidatorSuite extends FunSuite with MLlibTestSparkContext {
   }
 
   test("cross validation with logistic regression") {
+    crossValidateWithLR(false)
+  }
+
+  test("cross validation with logistic regression and use weights from previous model " +
+    "to start next training") {
+    crossValidateWithLR(true)
+  }
+
+  def crossValidateWithLR(usePreviousWeights: Boolean) {
     val lr = new LogisticRegression
     val lrParamMaps = new ParamGridBuilder()
       .addGrid(lr.regParam, Array(0.001, 1000.0))
@@ -52,6 +61,11 @@ class CrossValidatorSuite extends FunSuite with MLlibTestSparkContext {
       .setEstimatorParamMaps(lrParamMaps)
       .setEvaluator(eval)
       .setNumFolds(3)
+    // We only set on true since we also want to make sure that this param
+    // works with default value.
+    if (usePreviousWeights) {
+      cv.setUsePreviousWeights(true)
+    }
     val cvModel = cv.fit(dataset)
     val parent = cvModel.bestModel.parent.asInstanceOf[LogisticRegression]
     assert(parent.getRegParam === 0.001)
