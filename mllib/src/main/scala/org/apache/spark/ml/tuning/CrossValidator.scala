@@ -24,7 +24,9 @@ import org.apache.spark.annotation.Experimental
 import org.apache.spark.ml._
 import org.apache.spark.ml.evaluation.Evaluator
 import org.apache.spark.ml.param._
+import org.apache.spark.ml.param.shared.HasInitialWeights
 import org.apache.spark.ml.util.Identifiable
+import org.apache.spark.mllib.linalg.Vector
 import org.apache.spark.mllib.util.MLUtils
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.types.StructType
@@ -112,12 +114,20 @@ class CrossValidator(override val uid: String) extends Estimator[CrossValidatorM
     val numModels = epm.length
     val metrics = new Array[Double](epm.length)
     val splits = MLUtils.kFold(dataset.rdd, $(numFolds), 0)
-    splits.zipWithIndex.foreach { case ((training, validation), splitIndex) =>
+    splits.zipWithIndex.foldLeft(None: Option[(Double, Vector)])
+    { case (bestWeights, ((training, validation), splitIndex)) =>
       val trainingDataset = sqlCtx.createDataFrame(training, schema).cache()
       val validationDataset = sqlCtx.createDataFrame(validation, schema).cache()
-      // multi-model training
       logDebug(s"Train split $splitIndex with multiple sets of parameters.")
-      val models = est.fit(trainingDataset, epm).asInstanceOf[Seq[Model[_]]]
+      // If we are using the previous training results to set the initial weights for the current
+      bestWeights match {
+        case None => {}
+        case Some((_, w)) => {
+          epm.foreach(_.put(eval.getParam("asInitialWeights") -> w))
+        }
+      }
+      // multi-model training
+      val models =  est.fit(trainingDataset, epm).asInstanceOf[Seq[Model[_]]]
       trainingDataset.unpersist()
       var i = 0
       while (i < numModels) {
@@ -128,6 +138,7 @@ class CrossValidator(override val uid: String) extends Estimator[CrossValidatorM
         i += 1
       }
       validationDataset.unpersist()
+      None: Option[(Double, Vector)]
     }
     f2jBLAS.dscal(numModels, 1.0 / $(numFolds), metrics, 1)
     logInfo(s"Average cross-validation metrics: ${metrics.toSeq}")
