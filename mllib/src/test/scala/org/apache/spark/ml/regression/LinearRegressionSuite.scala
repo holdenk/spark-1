@@ -55,6 +55,36 @@ class LinearRegressionSuite extends SparkFunSuite with MLlibTestSparkContext {
 
   }
 
+    test("params") {
+    ParamsSuite.checkParams(new LinearRegression)
+    val model = new LogisticRegressionModel("linearReg", Vectors.dense(0.0), 0.0)
+    ParamsSuite.checkParams(model)
+  }
+
+  test("linear regression: default params") {
+    val lir = new LinearRegression
+    assert(lir.getLabelCol === "label")
+    assert(lir.getFeaturesCol === "features")
+    assert(lir.getPredictionCol === "prediction")
+    assert(lir.getRawPredictionCol === "rawPrediction")
+    assert(lir.getProbabilityCol === "probability")
+    assert(lir.getRegParam === 0.0)
+    assert(lir.getElasticNetParam === 0.0)
+    assert(lir.getFitIntercept)
+    assert(lir.getStandardization)
+    val model = lir.fit(dataset)
+    model.transform(dataset)
+      .select("label", "probability", "prediction", "rawPrediction")
+      .collect()
+    assert(model.getFeaturesCol === "features")
+    assert(model.getPredictionCol === "prediction")
+    assert(model.getRawPredictionCol === "rawPrediction")
+    assert(model.getProbabilityCol === "probability")
+    assert(model.intercept !== 0.0)
+    assert(model.hasParent)
+  }
+
+
   test("linear regression with intercept without regularization") {
     val trainer = new LinearRegression
     val model = trainer.fit(dataset)
