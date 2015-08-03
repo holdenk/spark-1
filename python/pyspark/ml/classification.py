@@ -56,6 +56,8 @@ class LogisticRegression(JavaEstimator, HasFeaturesCol, HasLabelCol, HasPredicti
     Traceback (most recent call last):
         ...
     TypeError: Method setParams forces keyword arguments.
+    >>> lr = LogisticRegression()
+    >>> lr.
     """
 
     # a placeholder to make it appear in the generated doc
@@ -65,7 +67,11 @@ class LogisticRegression(JavaEstimator, HasFeaturesCol, HasLabelCol, HasPredicti
               "the penalty is an L2 penalty. For alpha = 1, it is an L1 penalty.")
     fitIntercept = Param(Params._dummy(), "fitIntercept", "whether to fit an intercept term.")
     thresholds = Param(Params._dummy(), "thresholds",
-                       "array of thresholds in classification")
+                       "Thresholds in multi-class classification" +
+                       " to adjust the probability of predicting each class." +
+                       " Array must have length equal to the number of classes, with values >= 0." +
+                       " The class with largest value p/t is predicted, where p is the original" +
+                       " probability of that class and t is the class' threshold.")
 
     @keyword_only
     def __init__(self, featuresCol="features", labelCol="label", predictionCol="prediction",
@@ -75,6 +81,8 @@ class LogisticRegression(JavaEstimator, HasFeaturesCol, HasLabelCol, HasPredicti
         __init__(self, featuresCol="features", labelCol="label", predictionCol="prediction", \
                  maxIter=100, regParam=0.1, elasticNetParam=0.0, tol=1e-6, fitIntercept=True, \
                  threshold=None, thresholds=None, probabilityCol="probability")
+        Param thresholds overrides Param threshold; threshold is provided
+        for backwards compatibility and only applies to binary classification.
         """
         super(LogisticRegression, self).__init__()
         self._java_obj = self._new_java_obj(
@@ -88,10 +96,15 @@ class LogisticRegression(JavaEstimator, HasFeaturesCol, HasLabelCol, HasPredicti
         #: param for whether to fit an intercept term.
         self.fitIntercept = Param(self, "fitIntercept", "whether to fit an intercept term.")
         #: param for threshold in binary classification prediction, in range [0, 1].
-        self.thresholds = Param(self, "thresholds",
-                                "thresholds in classification")
+        self.thresholds = \
+            Param(self, "thresholds",
+                  "Thresholds in multi-class classification" +
+                  " to adjust the probability of predicting each class." +
+                  " Array must have length equal to the number of classes, with values >= 0." +
+                  " The class with largest value p/t is predicted, where p is the original" +
+                  " probability of that class and t is the class' threshold.")
         self._setDefault(maxIter=100, regParam=0.1, elasticNetParam=0.0, tol=1E-6,
-                         fitIntercept=True, thresholds=[0.5, 0.5])
+                         fitIntercept=True)
         kwargs = self.__init__._input_kwargs
         self.setParams(**kwargs)
 
@@ -102,12 +115,14 @@ class LogisticRegression(JavaEstimator, HasFeaturesCol, HasLabelCol, HasPredicti
         """
         setParams(self, featuresCol="features", labelCol="label", predictionCol="prediction", \
                   maxIter=100, regParam=0.1, elasticNetParam=0.0, tol=1e-6, fitIntercept=True, \
-                 threshold=None, probabilityCol="probability")
+                  threshold=None, thresholds=None, probabilityCol="probability")
         Sets params for logistic regression.
+        Param thresholds overrides Param threshold; threshold is provided
+        for backwards compatibility and only applies to binary classification.
         """
         # Under the hood we use thresholds so translate threshold to thresholds if applicable
         if thresholds is None and threshold is not None:
-            kwargs[thresholds] = [threshold, 1-threshold]
+            kwargs[thresholds] = [1-threshold, threshold]
         kwargs = self.setParams._input_kwargs
         return self._set(**kwargs)
 
@@ -142,9 +157,9 @@ class LogisticRegression(JavaEstimator, HasFeaturesCol, HasLabelCol, HasPredicti
 
     def setThreshold(self, value):
         """
-        Sets the value of :py:attr:`thresholds` using [value, 1-value].
+        Sets the value of :py:attr:`thresholds` using [1-value, value].
         """
-        return self.setThresholds([value, 1-value])
+        return self.setThresholds([1-value, value])
 
     def setThresholds(self, value):
         """
@@ -163,8 +178,11 @@ class LogisticRegression(JavaEstimator, HasFeaturesCol, HasLabelCol, HasPredicti
         """
         Gets the value of threshold or its default value.
         """
-        thresholds = self.getOrDefault(self.thresholds)
-        return 1/(1+thresholds[1]/thresholds[0])
+        if self.isDefined(self.thresholds):
+            thresholds = self.getOrDefault(self.thresholds)
+            return 1.0/(1.0+thresholds[0]/thresholds[1])
+        else:
+            return 0.5
 
 
 class LogisticRegressionModel(JavaModel):
