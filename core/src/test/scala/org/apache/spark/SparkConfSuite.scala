@@ -169,6 +169,16 @@ class SparkConfSuite extends SparkFunSuite with LocalSparkContext with ResetSyst
     }
   }
 
+  test("register kryo classes through registerKryoSerializers") {
+    val conf = new SparkConf().set("spark.kryo.registrationRequired", "true")
+
+    conf.registerKryoSerializers(Map(classOf[Class1] ->
+      com.esotericsoftware.kryo.serializers.FieldSerializer))
+
+    val serializer = new KryoSerializer(conf)
+    serializer.newInstance().serialize(new Class1())
+  }
+
   test("register kryo classes through registerKryoClasses") {
     val conf = new SparkConf().set("spark.kryo.registrationRequired", "true")
 

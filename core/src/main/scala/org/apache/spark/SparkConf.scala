@@ -17,6 +17,8 @@
 
 package org.apache.spark
 
+import com.esotericsoftware.kryo.Serializer
+
 import java.util.concurrent.ConcurrentHashMap
 
 import scala.collection.JavaConverters._
@@ -145,6 +147,23 @@ class SparkConf(loadDefaults: Boolean) extends Cloneable with Logging {
     if (settings.putIfAbsent(key, value) == null) {
       logDeprecationWarning(key)
     }
+    this
+  }
+
+  /**
+   * Register custom kryo serializers.
+   * If called multiple times, this will append the classes from all calls together.
+   */
+  def registerKryoSerializers(serializers: Map[Class[_], Serializer[_]]): SparkConf = {
+    val customClassNames = new LinkedHashSet[String]()
+    customClassNames ++= get("spark.kryo.customClasses", "").split(',').filter(!_.isEmpty)
+    customClassNames ++= serializers.map(_._1.getName)
+    set("spark.kryo.customClasses", customClassNames.mkString(","))
+    val customSerializers = new LinkedHashSet[String]()
+    customSerializers ++= get("spark.kryo.customSerializers", "").split(',').filter(!_.isEmpty)
+    customSerializers ++= serializers.map(_._2.getName)
+    set("spark.kryo.customSerializers", customSerializers.mkString(","))
+    set("spark.serializer", classOf[KryoSerializer].getName)
     this
   }
 
