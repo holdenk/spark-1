@@ -18,6 +18,7 @@
 package org.apache.spark
 
 import java.io.File
+import java.io.FileOutputStream
 
 import com.google.common.io.Files
 
@@ -79,7 +80,14 @@ private[spark] class HttpFileServer(
     if (file.isDirectory) {
       throw new IllegalArgumentException(s"$file cannot be a directory.")
     }
-    Files.copy(file, new File(dir, file.getName))
+    val outputStream = new FileOutputStream(new File(dir, file.getName))
+    try {
+      Files.copy(file, outputStream)
+      outputStream.flush()
+      otuputStream.getFD().sync()
+    } finally {
+      outputStream.close()
+    }
     dir + "/" + file.getName
   }
 
