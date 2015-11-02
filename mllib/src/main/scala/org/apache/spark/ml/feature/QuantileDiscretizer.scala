@@ -99,19 +99,19 @@ private[feature] object QuantileDiscretizer extends Logging {
   /**
    * Sampling from the given dataset to collect quantile statistics.
    */
-  def getSampledInput(dataset: DataFrame, numBins: Int): Array[Row] = {
+  def getSampledInput(dataset: DataFrame, numBins: Int): DataFrame = {
     val totalSamples = dataset.count()
     require(totalSamples > 0,
       "QuantileDiscretizer requires non-empty input dataset but was given an empty input.")
     val requiredSamples = math.max(numBins * numBins, 10000)
     val fraction = math.min(requiredSamples / dataset.count(), 1.0)
-    dataset.sample(withReplacement = false, fraction, new XORShiftRandom().nextInt()).collect()
+    dataset.sample(withReplacement = false, fraction, new XORShiftRandom().nextInt())
   }
 
   /**
    * Compute split points with respect to the sample distribution.
    */
-  def findSplitCandidates(samples: Array[Double], numSplits: Int): Array[Double] = {
+  def findSplitCandidates(samples: RDD[Double], numSplits: Int): Array[Double] = {
     val valueCountMap = samples.foldLeft(Map.empty[Double, Int]) { (m, x) =>
       m + ((x, m.getOrElse(x, 0) + 1))
     }
@@ -173,4 +173,3 @@ private[feature] object QuantileDiscretizer extends Logging {
     }
   }
 }
-
