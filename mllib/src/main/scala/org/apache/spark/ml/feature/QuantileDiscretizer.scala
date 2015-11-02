@@ -112,9 +112,8 @@ private[feature] object QuantileDiscretizer extends Logging {
    * Compute split points with respect to the sample distribution.
    */
   def findSplitCandidates(samples: RDD[Double], numSplits: Int): Array[Double] = {
-    val valueCountMap = samples.foldLeft(Map.empty[Double, Int]) { (m, x) =>
-      m + ((x, m.getOrElse(x, 0) + 1))
-    }
+    val valueCountRDD = samples.map((_, 1)).reduceByKey(_ + _)
+    val sortedValueCounts = valueCountRDD.sortByKey()
     val valueCounts = valueCountMap.toSeq.sortBy(_._1).toArray ++ Array((Double.MaxValue, 1))
     val possibleSplits = valueCounts.length - 1
     if (possibleSplits <= numSplits) {
