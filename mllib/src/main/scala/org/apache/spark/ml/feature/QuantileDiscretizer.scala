@@ -114,34 +114,17 @@ private[feature] object QuantileDiscretizer extends Logging {
   def findSplitCandidates(samples: RDD[Double], numSplits: Int): Array[Double] = {
     val valueCountRDD = samples.map((_, 1)).reduceByKey(_ + _)
     val sortedValueCounts = valueCountRDD.sortByKey()
-    val valueCounts = valueCountMap.toSeq.sortBy(_._1).toArray ++ Array((Double.MaxValue, 1))
-    val possibleSplits = valueCounts.length - 1
+    sortedValueCounts.cache()
+    val sampleCountPerPartition = sortedvalues.mapPartitions(itr =>
+      itr.map(_._2).reduce(_ + _)).collect()
+    val possibleSplits = sortedValueCounts.count()
+    // If the number of unique values is less than requested splits just return the values in order
     if (possibleSplits <= numSplits) {
-      valueCounts.dropRight(1).map(_._1)
+      valueCounts.collect().map(_._1)
     } else {
-      val stride: Double = math.ceil(samples.length.toDouble / (numSplits + 1))
-      val splitsBuilder = mutable.ArrayBuilder.make[Double]
-      var index = 1
-      // currentCount: sum of counts of values that have been visited
-      var currentCount = valueCounts(0)._2
-      // targetCount: target value for `currentCount`. If `currentCount` is closest value to
-      // `targetCount`, then current value is a split threshold. After finding a split threshold,
-      // `targetCount` is added by stride.
-      var targetCount = stride
-      while (index < valueCounts.length) {
-        val previousCount = currentCount
-        currentCount += valueCounts(index)._2
-        val previousGap = math.abs(previousCount - targetCount)
-        val currentGap = math.abs(currentCount - targetCount)
-        // If adding count of current value to currentCount makes the gap between currentCount and
-        // targetCount smaller, previous value is a split threshold.
-        if (previousGap < currentGap) {
-          splitsBuilder += valueCounts(index - 1)._1
-          targetCount += stride
-        }
-        index += 1
-      }
-      splitsBuilder.result()
+      val indexes = 1.to(numSplits).map((_ * possibleSplits / numSplits).toInt)
+      val previousPartitionsCount = sampleCountPerPartition.scanLeft(0)(_ + _)
+      val partition
     }
   }
 
