@@ -78,6 +78,7 @@ object GBT {
 
   def runForTrees(sc: SparkContext, depth: Int, numTrees: Int,
     testData: Array[Vector]): String = {
+    println(s"Generating ${numTrees} of depth ${depth}")
     val trees = 1.to(numTrees).map(x => generateTree(depth)).toArray
     val weights = 1.to(numTrees).map(x => x.toDouble / (2 * numTrees.toDouble)).toArray
     val model = new GBTClassificationModel("1", trees, weights, numFeatures)
