@@ -125,6 +125,11 @@ final class GBTClassifier(override val uid: String)
     }
   }
 
+  // DO NOT COMMIT CHANGE
+  def miniTrain(dataset: DataFrame): GBTClassificationModel = {
+    train(dataset)
+  }
+
   override protected def train(dataset: DataFrame): GBTClassificationModel = {
     val categoricalFeatures: Map[Int, Int] =
       MetadataUtils.getCategoricalFeatures(dataset.schema($(featuresCol)))
@@ -165,7 +170,7 @@ object GBTClassifier {
  * @param _treeWeights  Weights for the decision trees in the ensemble.
  */
 @Experimental
-final class GBTClassificationModel private[ml](
+final class GBTClassificationModel private[spark](
     override val uid: String,
     private val _trees: Array[DecisionTreeRegressionModel],
     private val _treeWeights: Array[Double],
@@ -198,6 +203,10 @@ final class GBTClassificationModel private[ml](
       bcastModel.value.predict(features.asInstanceOf[Vector])
     }
     dataset.withColumn($(predictionCol), predictUDF(col($(featuresCol))))
+  }
+
+  def miniPredict(features: Vector): Double = {
+    predict(features)
   }
 
   override protected def predict(features: Vector): Double = {
