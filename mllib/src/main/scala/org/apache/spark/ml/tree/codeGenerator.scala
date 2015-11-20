@@ -147,6 +147,7 @@ private[spark] object CodeGenerationDecisionTreeModel extends Logging {
       def call(v: Vector): Double
     }
     println("Generating with code of size " + code.size)
+    println("about to compile " + code)
     val jfunc = compile(code,
       Array(classOf[Serializable], classOf[CallableVectorDouble])).newInstance()
     def func(v: Vector): Double = {
