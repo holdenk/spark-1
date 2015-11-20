@@ -50,10 +50,10 @@ object GBT {
     val testData = makeRandomData(sc, inputSize * 5)
     val ctd = testData.map(_.features).collect()
     // JVM warmup
-    2.to(depth).foreach{depth => 1.to(600).foreach{trees =>
-      (runForTrees(sc, trees, depth, ctd))}}
+    1.to(depth).foreach{depth => 1.to(600).foreach{trees =>
+      (runForTrees(sc, depth, trees, ctd))}}
     // for real
-    2.to(depth).foreach{depth => 1.to(600).foreach{trees =>
+    1.to(depth).foreach{depth => 1.to(600).foreach{trees =>
       println(runForTrees(sc, depth, trees, ctd))}}
   }
 
