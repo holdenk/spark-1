@@ -52,6 +52,7 @@ object GBT {
     val testData = makeRandomData(sc, inputSize * 5)
     val ctd = testData.map(_.features).collect()
     val pw1 = new PrintWriter(new File("warmup.csv"))
+    pw1.write("depth,numTrees,nonCodeGenTime,codeGenTime\n")
     // JVM warmup
     1.to(depth).foreach{depth => 1.to(600).foreach{trees =>
       val info = runForTrees(sc, depth, trees, ctd)
@@ -60,6 +61,7 @@ object GBT {
     }}
     pw1.close()
     val pw2 = new PrintWriter(new File("warmup.csv"))
+    pw2.write("depth,numTrees,nonCodeGenTime,codeGenTime\n")
     // for real
     1.to(depth).foreach{depth => 1.to(600).foreach{trees =>
       val info = runForTrees(sc, depth, trees, ctd)
