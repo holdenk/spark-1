@@ -110,6 +110,11 @@ object GBT {
   def time(model: GBTClassificationModel,
     bmodel: Broadcast[GBTClassificationModel],
     test: Array[Vector]) = {
+    // JVM warmup
+    1.to(100).foreach(idx =>
+      test.foreach(elem =>
+        model.miniPredict(elem)))
+    // RL
     val localStart = System.currentTimeMillis()
     1.to(200).foreach(idx =>
       test.foreach(elem =>
