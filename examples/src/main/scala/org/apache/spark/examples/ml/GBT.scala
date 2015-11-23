@@ -56,7 +56,7 @@ object GBT {
     1.to(depth).foreach{depth => 1.to(600).foreach{trees =>
       val info = runForTrees(sc, depth, trees, ctd)
       println(s"warmuppanda,${info}")
-      pw1.write(info)
+      pw1.write(info + "\n")
     }}
     pw1.close()
     val pw2 = new PrintWriter(new File("warmup.csv"))
@@ -64,7 +64,7 @@ object GBT {
     1.to(depth).foreach{depth => 1.to(600).foreach{trees =>
       val info = runForTrees(sc, depth, trees, ctd)
       println(s"livepanda,${info}")
-      pw2.write(info)
+      pw2.write(info + "\n")
     }}
     pw2.close()
   }
