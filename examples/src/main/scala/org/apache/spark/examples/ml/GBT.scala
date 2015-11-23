@@ -56,7 +56,7 @@ object GBT {
       val pw1 = new PrintWriter(new File(s"warmup_${depth}.csv"))
       pw1.write("type,depth,numTrees,localNonCodeGenTime,localCodeGenTime\n")
       val resultStrs = sc.parallelize(1.to(numTrees)).map{trees =>
-        runForTrees(sc, depth, trees, ctd)
+        runForTrees(depth, trees, ctd)
       }.collect()
       pw1.write(resultStrs.mkString("\n"))
       pw1.close()
@@ -82,8 +82,7 @@ object GBT {
     new DecisionTreeRegressionModel("murh", generateNode(depth), numFeatures)
   }
 
-  def runForTrees(sc: SparkContext, depth: Int, numTrees: Int,
-    testData: Broadcast[Array[Vector]]): String = {
+  def runForTrees(depth: Int, numTrees: Int, testData: Broadcast[Array[Vector]]): String = {
     println(s"Generating ${numTrees} of depth ${depth}")
     val trees = 1.to(numTrees).map(x => generateTree(depth)).toArray
     val weights = 1.to(numTrees).map(x => x.toDouble / (2 * numTrees.toDouble)).toArray
