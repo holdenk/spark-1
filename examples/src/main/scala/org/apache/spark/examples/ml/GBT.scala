@@ -32,7 +32,7 @@ import java.io._
 
 object GBT {
 
-  val numFeatures = 15
+  val numFeatures = 10000
 
   def makeRandomData(sc: SparkContext, size: Int): RDD[LabeledPoint] = {
     val vectors = RandomRDDs.normalVectorRDD(sc, size, numFeatures)
