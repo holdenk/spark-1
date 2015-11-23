@@ -31,7 +31,8 @@ import org.apache.spark.mllib.linalg.Vectors
 import java.io._
 
 object GBT {
-  val numFeatures = 5
+
+  val numFeatures = 15
 
   def makeRandomData(sc: SparkContext, size: Int): RDD[LabeledPoint] = {
     val vectors = RandomRDDs.normalVectorRDD(sc, size, numFeatures)
@@ -52,24 +53,26 @@ object GBT {
     val testData = makeRandomData(sc, inputSize).map(_.features)
     val distributedTest = makeRandomData(sc, 10 * inputSize).map(_.features).cache()
     val ctd = testData.collect()
-    val pw1 = new PrintWriter(new File("warmup.csv"))
-    pw1.write("depth,numTrees,localNonCodeGenTime,localCodeGenTime,distributedNonCodeGenTime,distributedCodeGenTime\n")
-    // JVM warmup
-    1.to(depth).foreach{depth => 1.to(numTrees).foreach{trees =>
-      val info = runForTrees(sc, depth, trees, ctd, distributedTest)
-      println(s"warmuppanda,${info}")
-      pw1.write(info + "\n")
-    }}
-    pw1.close()
-    val pw2 = new PrintWriter(new File("warmup.csv"))
-    pw2.write("depth,numTrees,localNonCodeGenTime,localCodeGenTime,distributedNonCodeGenTime,distributedCodeGenTime\n")
-    // for real
-    1.to(depth).foreach{depth => 1.to(numTrees).foreach{trees =>
-      val info = runForTrees(sc, depth, trees, ctd, distributedTest)
-      println(s"livepanda,${info}")
-      pw2.write(info + "\n")
-    }}
-    pw2.close()
+    1.to(depth).foreach{depth =>
+      val pw1 = new PrintWriter(new File(s"warmup_${depth}.csv"))
+      pw1.write("type,depth,numTrees,localNonCodeGenTime,localCodeGenTime,distributedNonCodeGenTime,distributedCodeGenTime\n")
+      // JVM warmup
+      1.to(numTrees).foreach{trees =>
+        val info = runForTrees(sc, depth, trees, ctd, distributedTest)
+        println(s"warmuppanda,${info}")
+        pw1.write(info + "\n")
+      }
+      pw1.close()
+      val pw2 = new PrintWriter(new File("final_${depth}.csv"))
+      pw2.write("type,depth,numTrees,localNonCodeGenTime,localCodeGenTime,distributedNonCodeGenTime,distributedCodeGenTime\n")
+      // for real
+      1.to(numTrees).foreach{trees =>
+        val info = runForTrees(sc, depth, trees, ctd, distributedTest)
+        println(s"livepanda,${info}")
+        pw2.write(info + "\n")
+      }
+      pw2.close()
+    }
   }
 
   val rand = new scala.util.Random()
@@ -109,14 +112,16 @@ object GBT {
     bmodel: Broadcast[GBTClassificationModel],
     test: Array[Vector], distributedTest: RDD[Vector]) = {
     val localStart = System.currentTimeMillis()
-    1.to(20).foreach(idx =>
+    1.to(200).foreach(idx =>
       test.foreach(elem =>
         model.miniPredict(elem)))
     val localStop = System.currentTimeMillis()
     val distributedStart = System.currentTimeMillis()
-    1.to(20).foreach(idx =>
-      distributedTest.foreach(elem =>
-        bmodel.value.miniPredict(elem)))
+    1.to(200).foreach(idx =>
+      distributedTest.foreachPartition(elems => {
+        val model = bmodel.value
+        elems.foreach{elem => model.miniPredict(elem)}
+      }))
     val distributedStop = System.currentTimeMillis()
     ((localStop-localStart), (distributedStop-distributedStart))
   }
