@@ -28,6 +28,8 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{SQLContext, DataFrame}
 import org.apache.spark.mllib.linalg.Vectors
 
+import java.io._
+
 object GBT {
   val numFeatures = 5
 
@@ -49,12 +51,22 @@ object GBT {
   def run(sc: SparkContext, depth: Int, inputSize: Int): Unit = {
     val testData = makeRandomData(sc, inputSize * 5)
     val ctd = testData.map(_.features).collect()
+    val pw1 = new PrintWriter(new File("warmup.csv"))
     // JVM warmup
     1.to(depth).foreach{depth => 1.to(600).foreach{trees =>
-      (runForTrees(sc, depth, trees, ctd))}}
+      val info = runForTrees(sc, depth, trees, ctd)
+      println(s"warmuppanda,${info}")
+      pw1.write(info)
+    }}
+    pw1.close()
+    val pw2 = new PrintWriter(new File("warmup.csv"))
     // for real
     1.to(depth).foreach{depth => 1.to(600).foreach{trees =>
-      println(runForTrees(sc, depth, trees, ctd))}}
+      val info = runForTrees(sc, depth, trees, ctd)
+      println(s"livepanda,${info}")
+      pw2.write(info)
+    }}
+    pw2.close()
   }
 
   val rand = new scala.util.Random()
