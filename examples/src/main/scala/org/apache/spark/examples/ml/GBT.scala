@@ -32,7 +32,7 @@ import java.io._
 
 object GBT {
 
-  val numFeatures = 10000
+  val numFeatures = 1000
 
   def makeRandomData(sc: SparkContext, size: Int): RDD[LabeledPoint] = {
     val vectors = RandomRDDs.normalVectorRDD(sc, size, numFeatures)
@@ -51,26 +51,15 @@ object GBT {
 
   def run(sc: SparkContext, depth: Int, numTrees: Int, inputSize: Int): Unit = {
     val testData = makeRandomData(sc, inputSize).map(_.features)
-    val ctd = testData.collect()
+    val ctd = sc.broadcast(testData.collect())
     2.to(depth).foreach{depth =>
       val pw1 = new PrintWriter(new File(s"warmup_${depth}.csv"))
       pw1.write("type,depth,numTrees,localNonCodeGenTime,localCodeGenTime\n")
-      // JVM warmup
-      1.to(numTrees).foreach{trees =>
-        val info = runForTrees(sc, depth, trees, ctd)
-        println(s"warmuppanda,${info}")
-        pw1.write(info + "\n")
-      }
+      val resultStrs = sc.parallelize(1.to(numTrees)).map{trees =>
+        runForTrees(sc, depth, trees, ctd)
+      }.collect()
+      pw1.write(resultStrs.mkString("\n"))
       pw1.close()
-      val pw2 = new PrintWriter(new File("final_${depth}.csv"))
-      pw2.write("type,depth,numTrees,localNonCodeGenTime,localCodeGenTime\n")
-      // for real
-      1.to(numTrees).foreach{trees =>
-        val info = runForTrees(sc, depth, trees, ctd)
-        println(s"livepanda,${info}")
-        pw2.write(info + "\n")
-      }
-      pw2.close()
     }
   }
 
@@ -94,7 +83,7 @@ object GBT {
   }
 
   def runForTrees(sc: SparkContext, depth: Int, numTrees: Int,
-    testData: Array[Vector]): String = {
+    testData: Broadcast[Array[Vector]]): String = {
     println(s"Generating ${numTrees} of depth ${depth}")
     val trees = 1.to(numTrees).map(x => generateTree(depth)).toArray
     val weights = 1.to(numTrees).map(x => x.toDouble / (2 * numTrees.toDouble)).toArray
@@ -106,15 +95,16 @@ object GBT {
   }
 
   def time(model: GBTClassificationModel,
-    test: Array[Vector]) = {
+    test: Broadcast[Array[Vector]]) = {
+    val myTest = test.value
     // JVM warmup
-    1.to(100).foreach(idx =>
-      test.foreach(elem =>
+    1.to(500).foreach(idx =>
+      myTest.foreach(elem =>
         model.miniPredict(elem)))
     // RL
     val localStart = System.currentTimeMillis()
-    1.to(200).foreach(idx =>
-      test.foreach(elem =>
+    1.to(1000).foreach(idx =>
+      myTest.foreach(elem =>
         model.miniPredict(elem)))
     val localStop = System.currentTimeMillis()
     (localStop-localStart)
