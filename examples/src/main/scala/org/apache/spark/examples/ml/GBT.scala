@@ -52,7 +52,7 @@ object GBT {
   def run(sc: SparkContext, depth: Int, numTrees: Int, inputSize: Int): Unit = {
     val testData = makeRandomData(sc, inputSize).map(_.features)
     val ctd = testData.collect()
-    1.to(depth).foreach{depth =>
+    2.to(depth).foreach{depth =>
       val pw1 = new PrintWriter(new File(s"warmup_${depth}.csv"))
       pw1.write("type,depth,numTrees,localNonCodeGenTime,localCodeGenTime\n")
       // JVM warmup
