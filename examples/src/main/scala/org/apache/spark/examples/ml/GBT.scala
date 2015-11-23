@@ -99,16 +99,13 @@ object GBT {
     val trees = 1.to(numTrees).map(x => generateTree(depth)).toArray
     val weights = 1.to(numTrees).map(x => x.toDouble / (2 * numTrees.toDouble)).toArray
     val model = new GBTClassificationModel("1", trees, weights, numFeatures)
-    val bcastModel = sc.broadcast(model)
     val codeGenModel = model.toCodeGen()
-    val bcastCodeGenModel = sc.broadcast(codeGenModel)
-    val nonCodeGenTime = time(model, bcastModel, testData)
-    val codeGenTime = time(codeGenModel, bcastModel, testData)
+    val nonCodeGenTime = time(model, testData)
+    val codeGenTime = time(codeGenModel, testData)
     s"${depth},${numTrees},${nonCodeGenTime},${codeGenTime}"
   }
 
   def time(model: GBTClassificationModel,
-    bmodel: Broadcast[GBTClassificationModel],
     test: Array[Vector]) = {
     // JVM warmup
     1.to(100).foreach(idx =>
