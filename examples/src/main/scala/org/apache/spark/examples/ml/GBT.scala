@@ -51,23 +51,22 @@ object GBT {
 
   def run(sc: SparkContext, depth: Int, numTrees: Int, inputSize: Int): Unit = {
     val testData = makeRandomData(sc, inputSize).map(_.features)
-    val distributedTest = makeRandomData(sc, 10 * inputSize).map(_.features).cache()
     val ctd = testData.collect()
     1.to(depth).foreach{depth =>
       val pw1 = new PrintWriter(new File(s"warmup_${depth}.csv"))
-      pw1.write("type,depth,numTrees,localNonCodeGenTime,localCodeGenTime,distributedNonCodeGenTime,distributedCodeGenTime\n")
+      pw1.write("type,depth,numTrees,localNonCodeGenTime,localCodeGenTime\n")
       // JVM warmup
       1.to(numTrees).foreach{trees =>
-        val info = runForTrees(sc, depth, trees, ctd, distributedTest)
+        val info = runForTrees(sc, depth, trees, ctd)
         println(s"warmuppanda,${info}")
         pw1.write(info + "\n")
       }
       pw1.close()
       val pw2 = new PrintWriter(new File("final_${depth}.csv"))
-      pw2.write("type,depth,numTrees,localNonCodeGenTime,localCodeGenTime,distributedNonCodeGenTime,distributedCodeGenTime\n")
+      pw2.write("type,depth,numTrees,localNonCodeGenTime,localCodeGenTime\n")
       // for real
       1.to(numTrees).foreach{trees =>
-        val info = runForTrees(sc, depth, trees, ctd, distributedTest)
+        val info = runForTrees(sc, depth, trees, ctd)
         println(s"livepanda,${info}")
         pw2.write(info + "\n")
       }
@@ -95,7 +94,7 @@ object GBT {
   }
 
   def runForTrees(sc: SparkContext, depth: Int, numTrees: Int,
-    testData: Array[Vector], distributedTest: RDD[Vector]): String = {
+    testData: Array[Vector]): String = {
     println(s"Generating ${numTrees} of depth ${depth}")
     val trees = 1.to(numTrees).map(x => generateTree(depth)).toArray
     val weights = 1.to(numTrees).map(x => x.toDouble / (2 * numTrees.toDouble)).toArray
@@ -103,26 +102,19 @@ object GBT {
     val bcastModel = sc.broadcast(model)
     val codeGenModel = model.toCodeGen()
     val bcastCodeGenModel = sc.broadcast(codeGenModel)
-    val nonCodeGenTime = time(model, bcastModel, testData, distributedTest)
-    val codeGenTime = time(codeGenModel, bcastModel, testData, distributedTest)
-    s"${depth},${numTrees},${nonCodeGenTime._1},${codeGenTime._1},${nonCodeGenTime._2},${codeGenTime._2}"
+    val nonCodeGenTime = time(model, bcastModel, testData)
+    val codeGenTime = time(codeGenModel, bcastModel, testData)
+    s"${depth},${numTrees},${nonCodeGenTime},${codeGenTime}"
   }
 
   def time(model: GBTClassificationModel,
     bmodel: Broadcast[GBTClassificationModel],
-    test: Array[Vector], distributedTest: RDD[Vector]) = {
+    test: Array[Vector]) = {
     val localStart = System.currentTimeMillis()
     1.to(200).foreach(idx =>
       test.foreach(elem =>
         model.miniPredict(elem)))
     val localStop = System.currentTimeMillis()
-    val distributedStart = System.currentTimeMillis()
-    1.to(200).foreach(idx =>
-      distributedTest.foreachPartition(elems => {
-        val model = bmodel.value
-        elems.foreach{elem => model.miniPredict(elem)}
-      }))
-    val distributedStop = System.currentTimeMillis()
-    ((localStop-localStart), (distributedStop-distributedStart))
+    (localStop-localStart)
   }
 }
