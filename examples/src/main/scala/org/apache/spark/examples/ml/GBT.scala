@@ -54,8 +54,8 @@ object GBT {
     val ctd = sc.broadcast(testData.collect())
     2.to(depth).foreach{depth =>
       val pw1 = new PrintWriter(new File(s"warmup_${depth}.csv"))
-      pw1.write("type,depth,numTrees,localNonCodeGenTime,localCodeGenTime\n")
-      val resultStrs = sc.parallelize(1.to(numTrees)).map{trees =>
+      pw1.write("depth,numTrees,localNonCodeGenTime,localCodeGenTime\n")
+      val resultStrs = sc.parallelize(1.to(numTrees)).repartition(16).map{trees =>
         runForTrees(depth, trees, ctd)
       }.collect()
       pw1.write(resultStrs.mkString("\n"))
@@ -88,8 +88,8 @@ object GBT {
     val weights = 1.to(numTrees).map(x => x.toDouble / (2 * numTrees.toDouble)).toArray
     val model = new GBTClassificationModel("1", trees, weights, numFeatures)
     val codeGenModel = model.toCodeGen()
-    val nonCodeGenTime = time(model, testData)
     val codeGenTime = time(codeGenModel, testData)
+    val nonCodeGenTime = time(model, testData)
     s"${depth},${numTrees},${nonCodeGenTime},${codeGenTime}"
   }
 
@@ -97,12 +97,12 @@ object GBT {
     test: Broadcast[Array[Vector]]) = {
     val myTest = test.value
     // JVM warmup
-    1.to(500).foreach(idx =>
+    1.to(1000).foreach(idx =>
       myTest.foreach(elem =>
         model.miniPredict(elem)))
     // RL
     val localStart = System.currentTimeMillis()
-    1.to(1000).foreach(idx =>
+    1.to(10000).foreach(idx =>
       myTest.foreach(elem =>
         model.miniPredict(elem)))
     val localStop = System.currentTimeMillis()
