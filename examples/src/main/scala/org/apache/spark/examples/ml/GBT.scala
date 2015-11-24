@@ -102,7 +102,7 @@ object GBT {
         model.miniPredict(elem)))
     // RL
     val localStart = System.currentTimeMillis()
-    1.to(10000).foreach(idx =>
+    1.to(1000).foreach(idx =>
       myTest.foreach(elem =>
         model.miniPredict(elem)))
     val localStop = System.currentTimeMillis()
