@@ -32,7 +32,7 @@ import java.io._
 
 object GBT {
 
-  val numFeatures = 1000
+  val numFeatures = 5000
 
   def makeRandomData(sc: SparkContext, size: Int): RDD[LabeledPoint] = {
     val vectors = RandomRDDs.normalVectorRDD(sc, size, numFeatures)
@@ -55,7 +55,7 @@ object GBT {
     2.to(depth).foreach{depth =>
       val pw1 = new PrintWriter(new File(s"warmup_${depth}.csv"))
       pw1.write("depth,numTrees,localNonCodeGenTime,localCodeGenTime\n")
-      val resultStrs = sc.parallelize(1.to(numTrees)).repartition(16).map{trees =>
+      val resultStrs = sc.parallelize(1.to(numTrees, 5)).repartition(16).map{trees =>
         runForTrees(depth, trees, ctd)
       }.collect()
       pw1.write(resultStrs.mkString("\n"))
@@ -102,7 +102,7 @@ object GBT {
         model.miniPredict(elem)))
     // RL
     val localStart = System.currentTimeMillis()
-    1.to(1000).foreach(idx =>
+    1.to(1500).foreach(idx =>
       myTest.foreach(elem =>
         model.miniPredict(elem)))
     val localStop = System.currentTimeMillis()
