@@ -88,22 +88,22 @@ object GBT {
     val weights = 1.to(numTrees).map(x => x.toDouble / (2 * numTrees.toDouble)).toArray
     val model = new GBTClassificationModel("1", trees, weights, numFeatures)
     val codeGenModel = model.toCodeGen()
-    val codeGenTime = time(codeGenModel, testData)
-    val nonCodeGenTime = time(model, testData)
+    val tdv = testData.value
+    val codeGenTime = time(codeGenModel, tdv)
+    val nonCodeGenTime = time(model, tdv)
     s"${depth},${numTrees},${nonCodeGenTime},${codeGenTime}"
   }
 
   def time(model: GBTClassificationModel,
-    test: Broadcast[Array[Vector]]) = {
-    val myTest = test.value
+    test: Array[Vector]) = {
     // JVM warmup
-    1.to(1000).foreach(idx =>
-      myTest.foreach(elem =>
+    1.to(400).foreach(idx =>
+      test.foreach(elem =>
         model.miniPredict(elem)))
     // RL
     val localStart = System.currentTimeMillis()
-    1.to(1500).foreach(idx =>
-      myTest.foreach(elem =>
+    1.to(10).foreach(idx =>
+      test.foreach(elem =>
         model.miniPredict(elem)))
     val localStop = System.currentTimeMillis()
     (localStop-localStart)
