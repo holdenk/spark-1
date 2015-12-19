@@ -16,8 +16,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-import os.path
-import glob
+
+from __future__ import print_function
+import os
 
 def run_python_example(test_name, pyspark_python):
     """
@@ -34,7 +35,7 @@ def run_python_example(test_name, pyspark_python):
         retcode = subprocess.Popen(
             args, stderr=per_test_output, stdout=per_test_output, env=env).wait()
     except:
-        LOGGER.exception("Got exception while running %s with %s", test_name, pyspark_python)
+        print("Got exception while running %s with %s", test_name, pyspark_python)
         # Here, we use os._exit() instead of sys.exit() in order to force Python to exit even if
         # this code is invoked from a thread other than the main thread.
         os._exit(1)
@@ -43,5 +44,13 @@ def discover_python_examples():
     """
     Find the python examples to execute.
     """
-    base = os.path.join(os.path.dirname(os.path.realpath(__file__)), "python"))
-    return glob.glob(base + "/**/*.py",recursive=True)
+    dirpath = os.path.join(os.path.dirname(os.path.realpath(__file__)), "src/main/python")
+    return [os.path.join(dirpath, f)
+            for dirpath, dirnames, files in os.walk(dirpath)
+            for f in files if f.endswith('.py')]
+
+def main():
+    print(discover_python_examples())
+
+if __name__ == "__main__":
+    main()
