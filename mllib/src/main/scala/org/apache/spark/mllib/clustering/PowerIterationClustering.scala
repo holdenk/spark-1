@@ -105,9 +105,9 @@ object PowerIterationClusteringModel extends Loader[PowerIterationClusteringMode
 
 /**
  * Power Iteration Clustering (PIC), a scalable graph clustering algorithm developed by
- * [[http://www.icml2010.org/papers/387.pdf Lin and Cohen]]. From the abstract: PIC finds a very
- * low-dimensional embedding of a dataset using truncated power iteration on a normalized pair-wise
- * similarity matrix of the data.
+ * [[http://www.cs.cmu.edu/~wcohen/postscript/icml2010-pic-final.pdf Lin and Cohen]]. From the
+ * abstract: PIC finds a very low-dimensional embedding of a dataset using truncated power iteration
+ * on a normalized pair-wise similarity matrix of the data.
  *
  * @param k Number of clusters.
  * @param maxIterations Maximum number of iterations of the PIC algorithm.
@@ -387,7 +387,9 @@ object PowerIterationClustering extends Logging {
     val points = v.mapValues(x => Vectors.dense(x)).cache()
     val model = new KMeans()
       .setK(k)
-      .setRuns(5)
+      // Epsilon value is based on value from kmeans_cl.m in
+      // http://www.cs.cmu.edu/~frank/code/icml2010-code.zip by Frank Lin
+      .setEpsilon(0.00001)
       .setSeed(0L)
       .run(points.values)
     points.mapValues(p => model.predict(p)).cache()
