@@ -119,6 +119,14 @@ class KMeans private (
   @Since("0.8.0")
   @deprecated("Support for runs is deprecated. This param will have no effect in 2.0.0.", "1.6.0")
   def setRuns(runs: Int): this.type = {
+    internalSetRuns(runs)
+  }
+
+  /**
+   * For deprecation warnings: provide an internal version of setRuns - this should be removed at
+   * the same time as the public setRuns API.
+   */
+  private[mllib] def internalSetRuns(runs: Int): this.type = {
     if (runs <= 0) {
       throw new IllegalArgumentException("Number of runs must be positive")
     }
