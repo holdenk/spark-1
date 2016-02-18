@@ -56,7 +56,7 @@ class TaskMetrics private[spark] (initialAccums: Seq[Accumulator[_]]) extends Se
   /**
    * All accumulators registered with this task.
    */
-  private val accums = new ArrayBuffer[Accumulable[_, _]]
+  private val accums = new ArrayBuffer[GenericAccumulable[_, _, _]]
   accums ++= initialAccums
 
   /**
@@ -326,7 +326,7 @@ class TaskMetrics private[spark] (initialAccums: Seq[Accumulator[_]]) extends Se
    |        OTHER THINGS        |
    * ========================== */
 
-  private[spark] def registerAccumulator(a: Accumulable[_, _]): Unit = {
+  private[spark] def registerAccumulator(a: GenericAccumulable[_, _, _]): Unit = {
     accums += a
   }
 

@@ -34,6 +34,14 @@ import org.apache.spark.serializer.JavaSerializer
 class AccumulatorSuite extends SparkFunSuite with Matchers with LocalSparkContext {
   import AccumulatorParam._
 
+  override def afterEach(): Unit = {
+    try {
+      Accumulators.clear()
+    } finally {
+      super.afterEach()
+    }
+  }
+
   implicit def setAccum[A]: AccumulableParam[mutable.Set[A], A] =
     new AccumulableParam[mutable.Set[A], A] {
       def addInPlace(t1: mutable.Set[A], t2: mutable.Set[A]) : mutable.Set[A] = {
@@ -399,5 +407,5 @@ private[spark] class DummyTask(
     val internalAccums: Seq[Accumulator[_]],
     val externalAccums: Seq[Accumulator[_]])
   extends Task[Int](0, 0, 0, internalAccums) {
-  override def runTask(c: TaskContext): Int = 1
+  override def runTask(c: TaskContext): (Int, Boolean) = (1, false)
 }

@@ -981,7 +981,7 @@ class DAGScheduler(
       case NonFatal(e) =>
         stage.makeNewStageAttempt(partitionsToCompute.size)
         listenerBus.post(SparkListenerStageSubmitted(stage.latestInfo, properties))
-        abortStage(stage, s"Task creation failed: $e\n${e.getStackTraceString}", Some(e))
+        abortStage(stage, s"Task creation failed: $e\n${Utils.exceptionString(e)}", Some(e))
         runningStages -= stage
         return
     }
@@ -1017,7 +1017,7 @@ class DAGScheduler(
         // Abort execution
         return
       case NonFatal(e) =>
-        abortStage(stage, s"Task serialization failed: $e\n${e.getStackTraceString}", Some(e))
+        abortStage(stage, s"Task serialization failed: $e\n${Utils.exceptionString(e)}", Some(e))
         runningStages -= stage
         return
     }
@@ -1044,7 +1044,7 @@ class DAGScheduler(
       }
     } catch {
       case NonFatal(e) =>
-        abortStage(stage, s"Task creation failed: $e\n${e.getStackTraceString}", Some(e))
+        abortStage(stage, s"Task creation failed: $e\n${Utils.exceptionString(e)}", Some(e))
         runningStages -= stage
         return
     }
@@ -1093,8 +1093,8 @@ class DAGScheduler(
         val id = ainfo.id
         val partialValue = ainfo.update.get
         // Find the corresponding accumulator on the driver and update it
-        val acc: Accumulable[Any, Any] = Accumulators.get(id) match {
-          case Some(accum) => accum.asInstanceOf[Accumulable[Any, Any]]
+        val acc: GenericAccumulable[Any, Any, Any] = Accumulators.get(id) match {
+          case Some(accum) => accum.asInstanceOf[GenericAccumulable[Any, Any, Any]]
           case None =>
             throw new SparkException(s"attempted to access non-existent accumulator $id")
         }

@@ -28,6 +28,14 @@ class InternalAccumulatorSuite extends SparkFunSuite with LocalSparkContext {
   import InternalAccumulator._
   import AccumulatorParam._
 
+  override def afterEach(): Unit = {
+    try {
+      Accumulators.clear()
+    } finally {
+      super.afterEach()
+    }
+  }
+
   test("get param") {
     assert(getParam(EXECUTOR_DESERIALIZE_TIME) === LongAccumulatorParam)
     assert(getParam(EXECUTOR_RUN_TIME) === LongAccumulatorParam)
@@ -318,7 +326,7 @@ class InternalAccumulatorSuite extends SparkFunSuite with LocalSparkContext {
   private class SaveAccumContextCleaner(sc: SparkContext) extends ContextCleaner(sc) {
     private val accumsRegistered = new ArrayBuffer[Long]
 
-    override def registerAccumulatorForCleanup(a: Accumulable[_, _]): Unit = {
+    override def registerAccumulatorForCleanup(a: GenericAccumulable[_, _, _]): Unit = {
       accumsRegistered += a.id
       super.registerAccumulatorForCleanup(a)
     }
