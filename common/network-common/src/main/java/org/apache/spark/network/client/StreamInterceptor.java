@@ -19,6 +19,7 @@ package org.apache.spark.network.client;
 
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
+import java.util.concurrent.atomic.AtomicLong;
 
 import io.netty.buffer.ByteBuf;
 
@@ -35,7 +36,7 @@ class StreamInterceptor implements TransportFrameDecoder.Interceptor {
   private final long byteCount;
   private final StreamCallback callback;
 
-  private volatile long bytesRead;
+  private AtomicLong bytesRead;
 
   StreamInterceptor(
       TransportResponseHandler handler,
@@ -46,7 +47,7 @@ class StreamInterceptor implements TransportFrameDecoder.Interceptor {
     this.streamId = streamId;
     this.byteCount = byteCount;
     this.callback = callback;
-    this.bytesRead = 0;
+    this.bytesRead = new AtomicLong(0);
   }
 
   @Override
@@ -63,24 +64,24 @@ class StreamInterceptor implements TransportFrameDecoder.Interceptor {
 
   @Override
   public boolean handle(ByteBuf buf) throws Exception {
-    int toRead = (int) Math.min(buf.readableBytes(), byteCount - bytesRead);
+    int toRead = (int) Math.min(buf.readableBytes(), byteCount - bytesRead.get());
     ByteBuffer nioBuffer = buf.readSlice(toRead).nioBuffer();
 
     int available = nioBuffer.remaining();
     callback.onData(streamId, nioBuffer);
-    bytesRead += available;
-    if (bytesRead > byteCount) {
+    bytesRead.getAndAdd(available);
+    if (bytesRead.get() > byteCount) {
       RuntimeException re = new IllegalStateException(String.format(
         "Read too many bytes? Expected %d, but read %d.", byteCount, bytesRead));
       callback.onFailure(streamId, re);
       handler.deactivateStream();
       throw re;
-    } else if (bytesRead == byteCount) {
+    } else if (bytesRead.get() == byteCount) {
       handler.deactivateStream();
       callback.onComplete(streamId);
     }
 
-    return bytesRead != byteCount;
+    return bytesRead.get() != byteCount;
   }
 
 }
