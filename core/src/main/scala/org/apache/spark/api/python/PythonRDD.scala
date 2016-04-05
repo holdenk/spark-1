@@ -958,7 +958,7 @@ private[spark] class PythonBroadcast(@transient var path: String) extends Serial
    */
   override def finalize() {
     try {
-      if (!path.isEmpty) {
+      if (path.nonEmpty) {
         val file = new File(path)
         if (file.exists()) {
           if (!file.delete()) {
