@@ -33,7 +33,7 @@ private[ml] case class ParsedRFormula(label: ColumnRef, terms: Seq[Term]) {
    */
   def resolve(schema: StructType): ResolvedRFormula = {
     val dotTerms = expandDot(schema)
-    var includedTerms = Seq[Seq[String]]()
+    var includedTerms = Seq.empty[Seq[String]]
     terms.foreach {
       case col: ColumnRef =>
         includedTerms :+= Seq(col.value)

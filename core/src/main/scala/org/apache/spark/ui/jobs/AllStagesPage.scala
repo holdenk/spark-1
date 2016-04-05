@@ -113,7 +113,7 @@ private[ui] class AllStagesPage(parent: StagesTab) extends WebUIPage("") {
           if (sc.isDefined && isFairScheduler) {
             <h4>{pools.size} Fair Scheduler Pools</h4> ++ poolTable.toNodeSeq
           } else {
-            Seq[Node]()
+            Seq.empty[Node]
           }
         }
       if (shouldShowActiveStages) {

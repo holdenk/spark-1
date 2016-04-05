@@ -366,7 +366,7 @@ private class TestMasterInfo(val ip: String, val dockerId: DockerId, val logFile
 
       val status = json \\ "status"
       val stateString = status.extract[String]
-      state = RecoveryState.values.filter(state => state.toString == stateString).head
+      RecoveryState.values.find(state => state.toString == stateString).foreach(v => state = v)
     } catch {
       case e: Exception =>
         // ignore, no state update

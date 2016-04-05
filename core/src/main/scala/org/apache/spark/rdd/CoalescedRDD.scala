@@ -58,7 +58,7 @@ private[spark] case class CoalescedRDDPartition(
       val parentPreferredLocations = rdd.context.getPreferredLocs(rdd, p.index).map(_.host)
       preferredLocation.exists(parentPreferredLocations.contains)
     }
-    if (parents.size == 0) 0.0 else (loc.toDouble / parents.size.toDouble)
+    if (parents.isEmpty) 0.0 else (loc.toDouble / parents.size.toDouble)
   }
 }
 
@@ -165,7 +165,7 @@ private class PartitionCoalescer(maxPartitions: Int, prev: RDD[_], balanceSlack:
   val groupHash = mutable.Map[String, ArrayBuffer[PartitionGroup]]()
 
   // hash used for the first maxPartitions (to avoid duplicates)
-  val initialHash = mutable.Set[Partition]()
+  val initialHash = mutable.Set.empty[Partition]
 
   // determines the tradeoff between load-balancing the partitions sizes and their locality
   // e.g. balanceSlack=0.10 means that it allows up to 10% imbalance in favor of locality
@@ -291,7 +291,7 @@ private class PartitionCoalescer(maxPartitions: Int, prev: RDD[_], balanceSlack:
    */
   def pickBin(p: Partition): PartitionGroup = {
     val pref = currPrefLocs(p).map(getLeastGroupHash(_)).sortWith(compare) // least loaded pref locs
-    val prefPart = if (pref == Nil) None else pref.head
+    val prefPart = pref.headOption.getOrElse(None)
 
     val r1 = rnd.nextInt(groupArr.size)
     val r2 = rnd.nextInt(groupArr.size)

@@ -93,7 +93,7 @@ private[spark] object InternalAccumulator {
       case p @ IntAccumulatorParam => newMetric[Int](0, name, p)
       case p @ StringAccumulatorParam => newMetric[String]("", name, p)
       case p @ UpdatedBlockStatusesAccumulatorParam =>
-        newMetric[Seq[(BlockId, BlockStatus)]](Seq(), name, p)
+        newMetric[Seq[(BlockId, BlockStatus)]](Seq.empty, name, p)
       case p => throw new IllegalArgumentException(
         s"unsupported accumulator param '${p.getClass.getSimpleName}' for metric '$name'.")
     }

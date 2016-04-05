@@ -957,13 +957,17 @@ private[spark] class PythonBroadcast(@transient var path: String) extends Serial
    * Delete the file once the object is GCed.
    */
   override def finalize() {
-    if (!path.isEmpty) {
-      val file = new File(path)
-      if (file.exists()) {
-        if (!file.delete()) {
-          logWarning(s"Error deleting ${file.getPath}")
+    try {
+      if (!path.isEmpty) {
+        val file = new File(path)
+        if (file.exists()) {
+          if (!file.delete()) {
+            logWarning(s"Error deleting ${file.getPath}")
+          }
         }
       }
+    } finally {
+      super.finalize()
     }
   }
 }

@@ -292,7 +292,7 @@ private[spark] class MesosSchedulerBackend(
       val slavesIdsOfAcceptedOffers = HashSet[String]()
 
       // Call into the TaskSchedulerImpl
-      val acceptedOffers = scheduler.resourceOffers(workerOffers).filter(!_.isEmpty)
+      val acceptedOffers = scheduler.resourceOffers(workerOffers).filter(_.nonEmpty)
       acceptedOffers
         .foreach { offer =>
           offer.foreach { taskDesc =>

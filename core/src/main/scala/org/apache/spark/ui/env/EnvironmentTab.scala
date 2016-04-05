@@ -32,10 +32,10 @@ private[ui] class EnvironmentTab(parent: SparkUI) extends SparkUITab(parent, "en
  */
 @DeveloperApi
 class EnvironmentListener extends SparkListener {
-  var jvmInformation = Seq[(String, String)]()
-  var sparkProperties = Seq[(String, String)]()
-  var systemProperties = Seq[(String, String)]()
-  var classpathEntries = Seq[(String, String)]()
+  var jvmInformation = Seq.empty[(String, String)]
+  var sparkProperties = Seq.empty[(String, String)]
+  var systemProperties = Seq.empty[(String, String)]
+  var classpathEntries = Seq.empty[(String, String)]
 
   override def onEnvironmentUpdate(environmentUpdate: SparkListenerEnvironmentUpdate) {
     synchronized {

@@ -334,7 +334,7 @@ private[spark] class MesosClusterScheduler(
 
     stateLock.synchronized {
       this.masterInfo = Some(masterInfo)
-      if (!pendingRecover.isEmpty) {
+      if (pendingRecover.nonEmpty) {
         // Start task reconciliation if we need to recover.
         val statuses = pendingRecover.collect {
           case (taskId, slaveId) =>
@@ -361,7 +361,7 @@ private[spark] class MesosClusterScheduler(
       .map(path => Seq(path) ++ desc.command.libraryPathEntries)
       .getOrElse(desc.command.libraryPathEntries)
 
-    val prefixEnv = if (!entries.isEmpty) {
+    val prefixEnv = if (entries.nonEmpty) {
       Utils.libraryPathEnvPrefix(entries)
     } else {
       ""

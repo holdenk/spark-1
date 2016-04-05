@@ -1103,7 +1103,7 @@ private[spark] class BlockManager(
         peersForReplication --= peersReplicatedTo
         peersForReplication --= peersFailedToReplicateTo
       }
-      if (!peersForReplication.isEmpty) {
+      if (peersForReplication.nonEmpty) {
         Some(peersForReplication(random.nextInt(peersForReplication.size)))
       } else {
         None

@@ -91,7 +91,7 @@ private[spark] case class SSLOptions(
    * are supported by the current Java security provider for this protocol.
    */
   private val supportedAlgorithms: Set[String] = if (enabledAlgorithms.isEmpty) {
-    Set()
+    Set.empty[String]
   } else {
     var context: SSLContext = null
     try {
@@ -211,4 +211,3 @@ private[spark] object SSLOptions extends Logging {
   }
 
 }
-

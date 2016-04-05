@@ -215,7 +215,7 @@ private[spark] object CoarseGrainedExecutorBackend extends Logging {
     val userClassPath = new mutable.ListBuffer[URL]()
 
     var argv = args.toList
-    while (!argv.isEmpty) {
+    while (argv.nonEmpty) {
       argv match {
         case ("--driver-url") :: value :: tail =>
           driverUrl = value
