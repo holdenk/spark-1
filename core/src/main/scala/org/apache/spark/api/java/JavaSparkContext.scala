@@ -526,6 +526,21 @@ class JavaSparkContext(val sc: SparkContext)
     new JavaDoubleRDD(sc.union(rdds))
   }
 
+    /**
+   * Create an [[org.apache.spark.Accumulator]] variable, which tasks can "add" values
+   * to using the `add` method. Only the master can access the accumulator's `value`. This supports Integers and Doubles,
+   */
+  def accumulator[T](initialValue: T): Accumulator[T] = {
+    initialValue match {
+      case x: Int =>
+        sc.accumulator(x)(IntAccumulatorParam).asInstanceOf[Accumulator[T]]
+      case x: Double =>
+        sc.accumulator(x)(DoubleAccumulatorParam).asInstanceOf[Accumulator[T]]
+      case _ => throw new IllegalArgumentException(s"Supplied initial value ${initialValue} " +
+          s" is not one of the supported types (Integer or Double). You may wish to use accumulable")
+    }
+  }
+
   /**
    * Create an [[org.apache.spark.Accumulator]] integer variable, which tasks can "add" values
    * to using the `add` method. Only the master can access the accumulator's `value`.
