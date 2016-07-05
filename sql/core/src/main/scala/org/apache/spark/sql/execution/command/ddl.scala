@@ -206,7 +206,7 @@ case class DropTableCommand(
       } catch {
         case NonFatal(e) => log.warn(e.toString, e)
       }
-      catalog.refreshTable(tableName)
+      catalog.invalidateTable(tableName)
       catalog.dropTable(tableName, ifExists)
     }
     Seq.empty[Row]

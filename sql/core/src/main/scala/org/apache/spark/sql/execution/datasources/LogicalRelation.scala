@@ -85,10 +85,5 @@ case class LogicalRelation(
       expectedOutputAttributes,
       metastoreTableIdentifier).asInstanceOf[this.type]
 
-  override def refresh(): Unit = relation match {
-    case fs: HadoopFsRelation => fs.refresh()
-    case _ =>  // Do nothing.
-  }
-
   override def simpleString: String = s"Relation[${Utils.truncatedString(output, ",")}] $relation"
 }
