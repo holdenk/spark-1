@@ -84,3 +84,10 @@ abstract class Estimator[M <: Model[M]] extends PipelineStage {
 
   override def copy(extra: ParamMap): Estimator[M]
 }
+
+abstract class StreamingEstimator[T, M <: Model[M]] extends Estimator[M] {
+  protected def selectInput(input: DataFrame): DataFrame
+  def updateBatch(input: DataFrame) = {
+    update(selectInput(input).as[T])
+  }
+}

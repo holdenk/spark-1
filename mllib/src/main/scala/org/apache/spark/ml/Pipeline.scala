@@ -33,6 +33,7 @@ import org.apache.spark.ml.param.{Param, ParamMap, Params}
 import org.apache.spark.ml.util._
 import org.apache.spark.sql.{DataFrame, Dataset}
 import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.streaming.Query
 
 /**
  * :: DeveloperApi ::
@@ -162,7 +163,56 @@ class Pipeline @Since("1.4.0") (
       }
     }
 
-    new PipelineModel(uid, transformers.toArray).setParent(this)
+    model = new PipelineModel(uid, transformers.toArray).setParent(this)
+    model
+  }
+
+  /**
+   * Start a query to update the streaming models with new data.
+   */
+  def startQuery(): Query = {
+    /**
+     * Create the sink for handling updates.
+     */
+    object UpdatePipelineSinkProvider extends StreamSinkProvider {
+      def createSink(
+        sqlContext: SQLContext,
+        parameters: Map[String, String],
+        partitionColumns: Seq[String],
+        outputMode: OutputMode): Sink = {
+        UpdatePipelineSink
+      }
+    }
+    /**
+     * Sink for handling updates, skips tracking batches which have been processed so
+     * for now duplicate records/batches will simply be trained multiple times.
+     */
+    object UpdatePipelineSink extends Sink {
+      override def addBatch(batchId: Long, data: DataFrame): Unit = {
+        // Roundtrip the DataFrame through an RDD for SPARK-16020
+        val rdd = data.rdd()
+        val sqlCtx = data.sqlContext
+        val df = sqlCtx.createDataFrame(rdd, data.schema())
+        updateBatch(df)
+      }
+    }
+  }
+
+  /**
+   * Update the Pipeline model with a new batch of streaming data.
+   * If multiple Pipeline models have been fit updates the latest one.
+   */
+  private def updateBatch(df: Dataset[_]) = {
+    var curDataset = df
+    val theStages = $(stages)
+    // Swap this foreach for a fold?
+    theStages.view.zip(model.stages).foreach { case(stage, transformer) =>
+      stage match {
+        case e: StreamingEstimator[_] =>
+          e.updateBatch(curDataset)
+      }
+      curDataset = transformer.transform(curDataset)
+    }
   }
 
   @Since("1.4.0")
