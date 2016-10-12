@@ -20,6 +20,7 @@
 # expand alias for making virtualenv happy
 shopt -s expand_aliases
 
+VIRTUAL_ENV_NAME="sparklintvenv"
 VIRTUAL_ENV_DIR="build/venv"
 
 SCRIPT_DIR="$( cd "$( dirname "$0" )" && pwd )"
@@ -46,14 +47,21 @@ if [[ $1 == "--debug" || $1 == "-d" ]]; then
 fi
 
 
-if [[ ! -z $VIRTUAL_ENV ]]; then
-    echo "We already are inside a virtual environment: $VIRTUAL_ENV. Using it"
+if [[ ! -z $VIRTUAL_ENV  || ! -z $CONDA_PREFIX ]]; then
+    echo "We already are inside a virtual environment: $VIRTUAL_ENV$CONDA_PREFIX. Using it"
 else
+  if hash conda 2>/dev/null; then
+    echo "Not inside a virtual environment. Creating conda virtual env"
+    conda create -y -n $VIRTUAL_ENV_NAME python
+    source activate $VIRTUAL_ENV_NAME
+    echo "To activate this environment, use: 'source activate $VIRTUAL_ENV_NAME'"
+  else
     echo "Not inside a virtual environment. Jumping into one in: $VIRTUAL_ENV_DIR"
     $VIRTUALENV_EXEC $VIRTUAL_ENV_DIR || exit 1
     source $VIRTUAL_ENV_DIR/bin/activate
+    echo "To activate this environment, use: 'source $SPARK_ROOT_DIR/$VIRTUAL_ENV_DIR/bin/activate'"
+  fi
 fi
-echo "To activate this environment, use: 'source $SPARK_ROOT_DIR/$VIRTUAL_ENV_DIR/bin/activate'"
 
 pip install --upgrade "pip==$PIP_VERSION"
 echo "Installing developer requirements..."
