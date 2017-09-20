@@ -116,13 +116,6 @@ if [ -z "$SPARK_PACKAGE_VERSION" ]; then
   SPARK_PACKAGE_VERSION="${SPARK_VERSION}-$(date +%Y_%m_%d_%H_%M)-${git_hash}"
 fi
 
-# Drop the v from the start of the version string in publish-release mode for nexus.
-if [[ "$@" == *"publish-release"* ]]; then
-  # shellcheck disable=SC2001
-  VERSION_WITH_RC=$(echo "$RELEASE_TAG" | sed -e "s/v//")
-  SPARK_VERSION=$VERSION_WITH_RC
-fi
-
 DEST_DIR_NAME="spark-$SPARK_PACKAGE_VERSION"
 
 function LFTP {
@@ -312,6 +305,11 @@ if [[ "$1" == "docs" ]]; then
 fi
 
 if [[ "$1" == "publish-snapshot" ]]; then
+  # Drop the v from the start of the version string for nexus.
+  # shellcheck disable=SC2001
+  VERSION_WITH_RC=$(echo "$RELEASE_TAG" | sed -e "s/v//")
+  SPARK_VERSION=$VERSION_WITH_RC
+
   cd spark
   # Publish Spark to Maven release repo
   echo "Deploying Spark SNAPSHOT at '$GIT_REF' ($git_hash)"
@@ -346,6 +344,11 @@ if [[ "$1" == "publish-snapshot" ]]; then
 fi
 
 if [[ "$1" == "publish-release" ]]; then
+  # Drop the v from the start of the version string for nexus.
+  # shellcheck disable=SC2001
+  VERSION_WITH_RC=$(echo "$RELEASE_TAG" | sed -e "s/v//")
+  SPARK_VERSION=$VERSION_WITH_RC
+
   cd spark
   # Publish Spark to Maven release repo
   echo "Publishing Spark checkout at '$GIT_REF' ($git_hash)"
