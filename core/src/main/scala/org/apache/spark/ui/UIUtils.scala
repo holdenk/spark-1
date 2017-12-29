@@ -211,6 +211,7 @@ private[spark] object UIUtils extends Logging {
       useDataTables: Boolean = false): Seq[Node] = {
 
     val appName = activeTab.appName
+    val appId = activeTab.appId
     val shortAppName = if (appName.length < 36) appName else appName.take(32) + "..."
     val header = activeTab.headerTabs.map { tab =>
       <li class={if (tab == activeTab) "active" else ""}>
@@ -224,6 +225,7 @@ private[spark] object UIUtils extends Logging {
         {commonHeaderNodes}
         {if (showVisualization) vizHeaderNodes else Seq.empty}
         {if (useDataTables) dataTablesHeaderNodes else Seq.empty}
+        <script>const SPARK_APP_ID='{appId}';</script>
         <title>{appName} - {title}</title>
       </head>
       <body>
