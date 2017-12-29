@@ -140,6 +140,9 @@ function totalDurationColor(totalGCTime, totalDuration) {
     return (totalGCTime > GCTimePercent * totalDuration) ? "white" : "black";
 }
 
+
+
+
 $(document).ready(function () {
     $.extend($.fn.dataTable.defaults, {
         stateSave: true,
@@ -217,14 +220,10 @@ $(document).ready(function () {
         var deadTotalBlacklisted = 0;
 
         allExecutorsDataJSON.forEach(function (exec) {
-            var memoryMetrics = {
-                usedOnHeapStorageMemory: 0,
-                usedOffHeapStorageMemory: 0,
-                totalOnHeapStorageMemory: 0,
-                totalOffHeapStorageMemory: 0
-            };
-
-            exec.memoryMetrics = exec.hasOwnProperty('memoryMetrics') ? exec.memoryMetrics : memoryMetrics;
+            exec.onHeapMemoryUsed = exec.hasOwnProperty('onHeapMemoryUsed') ? exec.onHeapMemoryUsed : 0;
+            exec.maxOnHeapMemory = exec.hasOwnProperty('maxOnHeapMemory') ? exec.maxOnHeapMemory : 0;
+            exec.offHeapMemoryUsed = exec.hasOwnProperty('offHeapMemoryUsed') ? exec.offHeapMemoryUsed : 0;
+            exec.maxOffHeapMemory = exec.hasOwnProperty('maxOffHeapMemory') ? exec.maxOffHeapMemory : 0;
         });
 
         allExecutorsDataJSON.forEach(function (exec) {
@@ -366,10 +365,9 @@ $(document).ready(function () {
             "allTotalBlacklisted": deadTotalBlacklisted
         };
 
-        var data = {executors: response, "execSummary": [activeSummary, deadSummary, totalSummary]};
+        var data = {executors: allExecutorsDataJSON, "execSummary": [activeSummary, deadSummary, totalSummary]};
 
         executorsSummary.append(Mustache.render($(executorsSummaryTemplate).filter("#executors-summary-template").html(), data));
-
         var selector = "#active-executors-table";
         var conf = {
             "data": allExecutorsDataJSON,
@@ -467,8 +465,7 @@ $(document).ready(function () {
         };
 
         var dt = $(selector).DataTable(conf);
-        dt.column('executorLogsCol:name').visible(logsExist(allExecutorsDataJSON));
-        dt.column('threadDumpCol:name').visible(getThreadDumpEnabled());
+        dt.column(15).visible(logsExist(allExecutorsDataJSON));
         $('#active-executors [data-toggle="tooltip"]').tooltip();
 
         var sumSelector = "#summary-execs-table";
@@ -561,7 +558,6 @@ $(document).ready(function () {
 
         $(sumSelector).DataTable(sumConf);
         $('#execSummary [data-toggle="tooltip"]').tooltip();
-
     }
 
     if (getAjaxEnabled()) {
