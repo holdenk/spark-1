@@ -19,7 +19,7 @@
  * to be registered after the page loads. */
 $(function() {
     $("span.expand-additional-metrics").click(function(){
-        var status = window.localStorage.getItem("expand-additional-metrics") == "true";
+        var status = DB.getItem("expand-additional-metrics") == "true";
         status = !status;
 
         // Expand the list of additional metrics.
@@ -30,12 +30,12 @@ $(function() {
         $(this).find('.expand-additional-metrics-arrow').toggleClass('arrow-open');
         $(this).find('.expand-additional-metrics-arrow').toggleClass('arrow-closed');
 
-        window.localStorage.setItem("expand-additional-metrics", "" + status);
+        DB.setItem("expand-additional-metrics", "" + status);
     });
 
-    if (window.localStorage.getItem("expand-additional-metrics") == "true") {
+    if (DB.getItem("expand-additional-metrics") == "true") {
         // Set it to false so that the click function can revert it
-        window.localStorage.setItem("expand-additional-metrics", "false");
+        DB.setItem("expand-additional-metrics", "false");
         $("span.expand-additional-metrics").trigger("click");
     }
 
@@ -44,15 +44,15 @@ $(function() {
     $('input[type="checkbox"]').click(function() {
         var name = $(this).attr("name")
         var column = "table ." + name;
-        var status = window.localStorage.getItem(name) == "true";
+        var status = DB.getItem(name) == "true";
         status = !status;
         $(column).toggle();
         stripeSummaryTable();
-        window.localStorage.setItem(name, "" + status);
+        DB.setItem(name, "" + status);
     });
 
     $("#select-all-metrics").click(function() {
-       var status = window.localStorage.getItem("select-all-metrics") == "true";
+       var status = DB.getItem("select-all-metrics") == "true";
        status = !status;
        if (this.checked) {
           // Toggle all un-checked options.
@@ -61,19 +61,19 @@ $(function() {
           // Toggle all checked options.
           $('input[type="checkbox"]:checked').trigger('click');
        }
-       window.localStorage.setItem("select-all-metrics", "" + status);
+       DB.setItem("select-all-metrics", "" + status);
     });
 
-    if (window.localStorage.getItem("select-all-metrics") == "true") {
+    if (DB.getItem("select-all-metrics") == "true") {
         $("#select-all-metrics").attr('checked', status);
     }
 
     $("span.additional-metric-title").parent().find('input[type="checkbox"]').each(function() {
         var name = $(this).attr("name")
         // If name is undefined, then skip it because it's the "select-all-metrics" checkbox
-        if (name && window.localStorage.getItem(name) == "true") {
+        if (name && DB.getItem(name) == "true") {
             // Set it to false so that the click function can revert it
-            window.localStorage.setItem(name, "false");
+            DB.setItem(name, "false");
             $(this).trigger("click")
         }
     });
