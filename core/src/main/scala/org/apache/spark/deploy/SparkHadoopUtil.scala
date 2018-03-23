@@ -421,7 +421,21 @@ object SparkHadoopUtil {
    */
   private[spark] val SPARK_HADOOP_CONF_FILE = "__spark_hadoop_conf__.xml"
 
-  def get: SparkHadoopUtil = instance
+  def get: SparkHadoopUtil = {
+    val jarvisMode = java.lang.Boolean.parseBoolean(
+      System.getProperty("SPARK_JARVIS_MODE", System.getenv("SPARK_JARVIS_MODE")))
+    if (jarvisMode) {
+      try {
+        Utils.classForName("org.apache.spark.integration.JarvisSparkHadoopUtil")
+          .newInstance()
+          .asInstanceOf[SparkHadoopUtil]
+      } catch {
+        case e: Exception => throw new SparkException("Unable to load JARVIS support", e)
+      }
+    } else {
+      instance
+    }
+  }
 
   /**
    * Given an expiration date (e.g. for Hadoop Delegation Tokens) return a the date
