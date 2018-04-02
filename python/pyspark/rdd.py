@@ -71,6 +71,7 @@ class PythonEvalType(object):
     SQL_SCALAR_PANDAS_UDF = 200
     SQL_GROUPED_MAP_PANDAS_UDF = 201
     SQL_GROUPED_AGG_PANDAS_UDF = 202
+    SQL_COMPLEX_MAP_PANDAS_UDF = 203
 
 
 def portable_hash(x):

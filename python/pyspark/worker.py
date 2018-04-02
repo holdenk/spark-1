@@ -76,7 +76,7 @@ def wrap_udf(f, return_type):
 
 
 def wrap_scalar_pandas_udf(f, return_type):
-    arrow_return_type = to_arrow_type(return_type)
+    arrow_return_type = to_arrow_schema(return_type)
 
     def verify_result_length(*a):
         result = f(*a)

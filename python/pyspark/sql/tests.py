@@ -4457,6 +4457,20 @@ class ScalarPandasUDFTests(ReusedSQLTestCase):
         self.assertEquals(expected.collect(), res1.collect())
         self.assertEquals(expected.collect(), res2.collect())
 
+    def test_vectorized_udf_basic_structtype(self):
+        output_schema = StructType(
+            [StructField('v', IntegerType()),
+             StructField('arr', ArrayType(LongType())),
+             StructField('v1', DoubleType())])
+
+        @pandas_udf(output_schema, PandasUDFType.SCALAR)
+        def process_elem(inputSeries):
+            return inputSeries.apply(lambda elem: (elem, [elem, 12], elem * 0.1))
+
+        df = self.spark.createDataFrame([(1,)])
+        df.withColumn('magic', process_elem(df._1))
+        self.assertEquals(df.collect(), result.collect())
+
     # Regression test for SPARK-23314
     def test_timestamp_dst(self):
         from pyspark.sql.functions import pandas_udf
