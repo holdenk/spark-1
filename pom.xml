@@ -240,6 +240,17 @@
         <enabled>false</enabled>
       </snapshots>
     </repository>
+    <repository>
+      <name>Confluent Repository</name>
+      <id>confluent</id>
+      <url>http://packages.confluent.io/maven</url>
+      <releases>
+        <enabled>true</enabled>
+      </releases>
+      <snapshots>
+        <enabled>true</enabled>
+      </snapshots>
+    </repository>
   </repositories>
   <pluginRepositories>
     <pluginRepository>

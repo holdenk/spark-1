@@ -21,7 +21,7 @@ import scala.collection.JavaConverters._
 
 import org.apache.spark.sql.AnalysisException
 import org.apache.spark.sql.catalyst.analysis.MultiInstanceRelation
-import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Expression}
+import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.plans.QueryPlan
 import org.apache.spark.sql.catalyst.plans.logical.{LeafNode, LogicalPlan, Statistics}
 import org.apache.spark.sql.execution.datasources.DataSourceStrategy
@@ -140,7 +140,23 @@ case class StreamingDataSourceV2Relation(
     case _ =>
       Statistics(sizeInBytes = conf.defaultSizeInBytes)
   }
+
+  def pushDown(filters: Array[Expression]):
+      (StreamingDataSourceV2Relation, Array[Expression]) = {
+    reader match {
+      case x: StreamingPushDownReader =>
+        val (newReader, unhandledFilters) = x.pushDown(filters)
+        (this.copy(reader = newReader), unhandledFilters)
+      case _ =>
+        (this, filters)
+    }
+  }
 }
+
+trait StreamingPushDownReader {
+  def pushDown(filters: Array[Expression]): (DataSourceReader, Array[Expression])
+}
+
 
 object DataSourceV2Relation {
   private implicit class SourceHelpers(source: DataSourceV2) {

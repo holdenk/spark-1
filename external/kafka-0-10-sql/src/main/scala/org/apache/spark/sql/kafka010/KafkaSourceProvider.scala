@@ -130,22 +130,15 @@ private[kafka010] class KafkaSourceProvider extends DataSourceRegister
         .map { k => k.drop(6).toString -> parameters(k) }
         .toMap
 
-    val startingStreamOffsets = KafkaSourceProvider.getKafkaOffsetRangeLimit(caseInsensitiveParams,
-      STARTING_OFFSETS_OPTION_KEY, LatestOffsetRangeLimit)
-
-    val kafkaOffsetReader = new KafkaOffsetReader(
-      strategy(caseInsensitiveParams),
-      kafkaParamsForDriver(specifiedKafkaParams),
-      parameters,
-      driverGroupIdPrefix = s"$uniqueGroupId-driver")
-
     new KafkaMicroBatchReader(
-      kafkaOffsetReader,
+      uniqueGroupId,
       kafkaParamsForExecutors(specifiedKafkaParams, uniqueGroupId),
       options,
       metadataPath,
-      startingStreamOffsets,
-      failOnDataLoss(caseInsensitiveParams))
+      schema.get,
+      strategy(caseInsensitiveParams),
+      failOnDataLoss(caseInsensitiveParams),
+      caseInsensitiveParams)
   }
 
   /**

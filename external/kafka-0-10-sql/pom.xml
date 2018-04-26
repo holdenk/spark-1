@@ -75,6 +75,11 @@
       <scope>test</scope>
     </dependency>
     <dependency>
+      <groupId>io.confluent.ksql</groupId>
+      <artifactId>ksql-package</artifactId>
+      <version>4.1.0</version>
+    </dependency>
+    <dependency>
       <groupId>net.sf.jopt-simple</groupId>
       <artifactId>jopt-simple</artifactId>
       <version>3.2</version>

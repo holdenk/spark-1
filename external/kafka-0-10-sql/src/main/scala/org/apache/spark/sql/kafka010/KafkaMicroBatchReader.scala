@@ -20,22 +20,28 @@ package org.apache.spark.sql.kafka010
 import java.{util => ju}
 import java.io._
 import java.nio.charset.StandardCharsets
+import java.util.{Locale, Optional, UUID}
 
 import scala.collection.JavaConverters._
 
+import io.confluent.ksql.KsqlContext
+import io.confluent.ksql.util.KsqlConfig
 import org.apache.commons.io.IOUtils
 
 import org.apache.spark.SparkEnv
 import org.apache.spark.internal.Logging
 import org.apache.spark.scheduler.ExecutorCacheTaskLocation
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.catalyst.expressions.UnsafeRow
+import org.apache.spark.sql.catalyst.expressions.{Expression, UnsafeRow}
+import org.apache.spark.sql.execution.datasources.DataSourceStrategy
+import org.apache.spark.sql.execution.datasources.v2._
 import org.apache.spark.sql.execution.streaming.{HDFSMetadataLog, SerializedOffset}
 import org.apache.spark.sql.kafka010.KafkaSourceProvider.{INSTRUCTION_FOR_FAIL_ON_DATA_LOSS_FALSE, INSTRUCTION_FOR_FAIL_ON_DATA_LOSS_TRUE}
-import org.apache.spark.sql.sources.v2.DataSourceOptions
-import org.apache.spark.sql.sources.v2.reader.{DataReader, DataReaderFactory, SupportsScanUnsafeRow}
+import org.apache.spark.sql.sources._
+import org.apache.spark.sql.sources.v2._
+import org.apache.spark.sql.sources.v2.reader._
 import org.apache.spark.sql.sources.v2.reader.streaming.{MicroBatchReader, Offset}
-import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.types._
 import org.apache.spark.util.UninterruptibleThread
 
 /**
@@ -55,25 +61,99 @@ import org.apache.spark.util.UninterruptibleThread
  * and not use wrong broker addresses.
  */
 private[kafka010] class KafkaMicroBatchReader(
-    kafkaOffsetReader: KafkaOffsetReader,
+    uniqueGroupId: String,
     executorKafkaParams: ju.Map[String, Object],
-    options: DataSourceOptions,
+    sourceOptions: DataSourceOptions,
     metadataPath: String,
-    startingOffsets: KafkaOffsetRangeLimit,
-    failOnDataLoss: Boolean)
-  extends MicroBatchReader with SupportsScanUnsafeRow with Logging {
+    schema: StructType,
+    strategy: ConsumerStrategy,
+    failOnDataLoss: Boolean,
+    caseInsensitiveParams: Map[String, String])
+  extends MicroBatchReader with SupportsScanUnsafeRow with Logging with StreamingPushDownReader {
 
   private var startPartitionOffsets: PartitionOffsetMap = _
   private var endPartitionOffsets: PartitionOffsetMap = _
 
-  private val pollTimeoutMs = options.getLong(
+
+  var options = sourceOptions
+
+  private lazy val pollTimeoutMs = options.getLong(
     "kafkaConsumer.pollTimeoutMs",
     SparkEnv.get.conf.getTimeAsMs("spark.network.timeout", "120s"))
 
   private val maxOffsetsPerTrigger =
     Option(options.get("maxOffsetsPerTrigger").orElse(null)).map(_.toLong)
 
-  private val rangeCalculator = KafkaOffsetRangeCalculator(options)
+  var ksqlContextOption: Option[KsqlContext] = None
+
+  lazy val startingOffsets = KafkaSourceProvider.getKafkaOffsetRangeLimit(caseInsensitiveParams,
+    KafkaSourceProvider.STARTING_OFFSETS_OPTION_KEY, LatestOffsetRangeLimit)
+
+  lazy val parameters = options.asMap().asScala.toMap
+  lazy val specifiedKafkaParams = parameters
+        .keySet
+        .filter(_.toLowerCase(Locale.ROOT).startsWith("kafka."))
+        .map { k => k.drop(6).toString -> parameters(k) }
+        .toMap
+
+  lazy val kafkaOffsetReader = new KafkaOffsetReader(
+      strategy,
+      KafkaSourceProvider.kafkaParamsForDriver(specifiedKafkaParams),
+      parameters,
+      driverGroupIdPrefix = s"$uniqueGroupId-driver")
+
+
+  override def pushDown(filters: Array[Expression]):
+      (KafkaMicroBatchReader, Array[Expression]) = {
+    val uniqueGroupId = s"spark-kafka-pushdown-${UUID.randomUUID}"
+    // Figure out which topic we want, for now we only support one topic
+    val srcTopic = options.get("subscribe")
+    val topicKey = options.get("topicKey")
+    // Construct a KSQL client
+    val ksqlContext = ksqlContextOption.getOrElse(
+      KsqlContext.create(new KsqlConfig(ju.Collections.emptyMap())))
+    // Parse the topic in KSQL
+    val topicInfo = s"(format = 'json',  kafka_topic='${srcTopic}')"
+    ksqlContext.sql(s"REGISTER TOPIC ${uniqueGroupId}_parsed WITH ${topicInfo};");
+    // TODO proper KSQL schema conversion, for now everything is either a bigint or string
+    def convertType(dataType: DataType): String = {
+      dataType match {
+        case StringType => "string"
+        case LongType => "bigint"
+      }
+    }
+
+    def formatField(field: StructField): String = {
+      s"${field.name} ${convertType(field.dataType)}"
+    }
+
+    val ksqlSchema = schema.fields.map(formatField).mkString(",")
+    val streamInfo = s"WITH (topic_name='${uniqueGroupId}_parsed', key='${topicKey}')"
+    ksqlContext.sql(s"CREATE STREAM ${uniqueGroupId}_stream (${ksqlSchema}) ${streamInfo};")
+    def convertFilter(filter: Filter) = {
+      filter match {
+        case EqualTo(attr, value) => Some(s"${attr} == ${value}")
+        case GreaterThan(attr, value) => Some(s"${attr} > ${value}")
+        case _ => None
+      }
+    }
+    val translatedFilters = filters.flatMap(e => DataSourceStrategy.translateFilter(e))
+    val convertedFilters = translatedFilters.flatMap(f => convertFilter(f))
+    val ksqlFilters = convertedFilters.mkString(" AND ")
+    val ksqlFilterExpression = ksqlFilters match {
+      case "" => ""
+      case _ => "WHERE ${ksqlFilters}"
+    }
+    val selectStatement = s"SELECT * ${ksqlFilterExpression}"
+    ksqlContext.sql(s"CREATE STREAM ${uniqueGroupId}_stream_filtered AS ${selectStatement};")
+    // Update the options
+    val optionsMap = ((options.asMap().asScala - "subscribe")
+      + ("subscribe" -> "${uniqueGroupId}_stream_filtered"))
+    options = new DataSourceOptions(optionsMap.asJava)
+    (this, filters)
+  }
+
+  private lazy val rangeCalculator = KafkaOffsetRangeCalculator(options)
   /**
    * Lazily initialize `initialPartitionOffsets` to make sure that `KafkaConsumer.poll` is only
    * called in StreamExecutionThread. Otherwise, interrupting a thread while running

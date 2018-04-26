@@ -26,6 +26,13 @@ object PushDownOperatorsToDataSource extends Rule[LogicalPlan] {
   override def apply(
       plan: LogicalPlan): LogicalPlan = plan transformUp {
     // PhysicalOperation guarantees that filters are deterministic; no need to check
+    case PhysicalOperation(project, newFilters, relation : StreamingDataSourceV2Relation) =>
+      val attributes = project.map(_.toAttribute).toArray
+      val (newRelation, unpushed) = relation.pushDown(newFilters.toArray)
+      val unpushedFilter = unpushed.reduceLeftOption(And)
+      val filtered = unpushedFilter.map(Filter(_, newRelation)).getOrElse(newRelation)
+      Project(project, filtered)
+    // PhysicalOperation guarantees that filters are deterministic; no need to check
     case PhysicalOperation(project, newFilters, relation : DataSourceV2Relation) =>
       // merge the filters
       val filters = relation.filters match {
