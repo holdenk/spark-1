@@ -17,9 +17,16 @@
 
 package org.apache.spark.ml.feature
 
+import java.io.{File, OutputStream, StringWriter}
+import java.text.SimpleDateFormat
+import java.util.{Date, Locale}
+import javax.xml.transform.stream.StreamResult
+
+import scala.{Array => SArray}
 import scala.collection.mutable
 
 import org.apache.hadoop.fs.Path
+import org.jpmml.model.JAXBUtil
 
 import org.apache.spark.annotation.Since
 import org.apache.spark.ml._
@@ -164,7 +171,7 @@ class StandardScalerModel private[ml] (
     transformSchema(dataset.schema, logging = true)
     val scaler = new feature.StandardScalerModel(std, mean, $(withStd), $(withMean))
 
-    // TODO: Make the transformer natively in ml framework to avoid extra conversion.
+    // TODO(SPARK-24283): Make the transformer natively in ml framework to avoid extra conversion.
     val transformer: Vector => Vector = v => scaler.transform(OldVectors.fromML(v)).asML
 
     val scale = udf(transformer)
@@ -204,6 +211,63 @@ private[spark] class InternalStandardScalerModelWriter extends MLWriterFormat
     sparkSession.createDataFrame(Seq(data)).repartition(1).write.parquet(dataPath)
   }
 }
+
+private[spark] class PMMLStandardScalerModelWriter extends MLWriterFormat
+    with MLFormatRegister {
+
+  import org.dmg.pmml._
+
+  override def format(): String = "pmml"
+  override def stageName(): String = "org.apache.spark.ml.feature.StandardScalerModel"
+
+  private case class Data(std: Vector, mean: Vector)
+
+  override def write(path: String, sparkSession: SparkSession,
+    optionMap: mutable.Map[String, String], stage: PipelineStage): Unit = {
+    val instance = stage.asInstanceOf[StandardScalerModel]
+    // TODO(holden): factor this out somewhere common, and allow chaining.
+    val pmml: PMML = {
+      val version = getClass.getPackage.getImplementationVersion
+      val app = new Application("Apache Spark ML").setVersion(version)
+      val timestamp = new Timestamp()
+        .addContent(new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US).format(new Date()))
+      val header = new Header()
+        .setApplication(app)
+        .setTimestamp(timestamp)
+      new PMML("4.2", header, null)
+    }
+    // Construct our input fields
+    val dataDictionary = new DataDictionary
+    val fields = new SArray[FieldName](instance.mean.size)
+    for (i <- 0 until instance.mean.size) {
+      val field = FieldName.create("field_" + i)
+      fields(i) = field
+      dataDictionary.addDataFields(
+        new DataField(field, OpType.CONTINUOUS, DataType.DOUBLE))
+    }
+    for (i <- 0 until instance.mean.size) {
+      val field = fields(i)
+      val statType = BaselineTestStatisticType.Z_VALUE
+      val distribution = new GaussianDistribution(instance.mean(i), instance.std(i))
+      val baseLine = new Baseline()
+        .setContinuousDistribution(distribution)
+      val testDistributions = new TestDistributions(field, statType, baseLine)
+      val miningSchema = new MiningSchema()
+        .addMiningFields(new MiningField(field).setUsageType(FieldUsageType.ACTIVE))
+      val miningFunctionType = MiningFunctionType.REGRESSION
+      val baselineModel = new BaselineModel(miningFunctionType, miningSchema, testDistributions)
+      pmml.addModels(baselineModel)
+    }
+    // TODO(holden) - Factor int a common base util.
+    val writer = new StringWriter
+    val streamResult = new StreamResult(writer)
+    JAXBUtil.marshalPMML(pmml, streamResult)
+    val pmml_text = writer.toString
+    val sc = sparkSession.sparkContext
+    sc.parallelize(SArray(pmml_text), 1).saveAsTextFile(path)
+  }
+}
+
 
 
 @Since("1.6.0")
