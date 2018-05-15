@@ -17,6 +17,8 @@
 
 package org.apache.spark.ml.feature
 
+import scala.collection.mutable
+
 import org.apache.hadoop.fs.Path
 
 import org.apache.spark.annotation.Since
@@ -145,7 +147,7 @@ class StandardScalerModel private[ml] (
     @Since("1.4.0") override val uid: String,
     @Since("2.0.0") val std: Vector,
     @Since("2.0.0") val mean: Vector)
-  extends Model[StandardScalerModel] with StandardScalerParams with MLWritable {
+  extends Model[StandardScalerModel] with StandardScalerParams with GeneralMLWritable {
 
   import StandardScalerModel._
 
@@ -181,24 +183,31 @@ class StandardScalerModel private[ml] (
   }
 
   @Since("1.6.0")
-  override def write: MLWriter = new StandardScalerModelWriter(this)
+  override def write: GeneralMLWriter = new GeneralMLWriter(this)
 }
+
+private[spark] class InternalStandardScalerModelWriter extends MLWriterFormat
+    with MLFormatRegister {
+
+  override def format(): String = "internal"
+  override def stageName(): String = "org.apache.spark.ml.feature.StandardScalerModel"
+
+  private case class Data(std: Vector, mean: Vector)
+
+  override def write(path: String, sparkSession: SparkSession,
+    optionMap: mutable.Map[String, String], stage: PipelineStage): Unit = {
+    val instance = stage.asInstanceOf[StandardScalerModel]
+    val sc = sparkSession.sparkContext
+    DefaultParamsWriter.saveMetadata(instance, path, sc)
+    val data = Data(instance.std, instance.mean)
+    val dataPath = new Path(path, "data").toString
+    sparkSession.createDataFrame(Seq(data)).repartition(1).write.parquet(dataPath)
+  }
+}
+
 
 @Since("1.6.0")
 object StandardScalerModel extends MLReadable[StandardScalerModel] {
-
-  private[StandardScalerModel]
-  class StandardScalerModelWriter(instance: StandardScalerModel) extends MLWriter {
-
-    private case class Data(std: Vector, mean: Vector)
-
-    override protected def saveImpl(path: String): Unit = {
-      DefaultParamsWriter.saveMetadata(instance, path, sc)
-      val data = Data(instance.std, instance.mean)
-      val dataPath = new Path(path, "data").toString
-      sparkSession.createDataFrame(Seq(data)).repartition(1).write.parquet(dataPath)
-    }
-  }
 
   private class StandardScalerModelReader extends MLReader[StandardScalerModel] {
 
