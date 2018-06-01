@@ -17,13 +17,15 @@
 
 package org.apache.spark.ml.feature
 
+import org.dmg.pmml.{BaselineModel, PMML}
+
 import org.apache.spark.ml.linalg.{Vector, Vectors}
 import org.apache.spark.ml.param.ParamsSuite
-import org.apache.spark.ml.util.{DefaultReadWriteTest, MLTest, MLTestingUtils}
+import org.apache.spark.ml.util.{DefaultReadWriteTest, MLTest, MLTestingUtils, PMMLReadWriteTest}
 import org.apache.spark.ml.util.TestingUtils._
 import org.apache.spark.sql.{DataFrame, Row}
 
-class StandardScalerSuite extends MLTest with DefaultReadWriteTest {
+class StandardScalerSuite extends MLTest with DefaultReadWriteTest with PMMLReadWriteTest {
 
   import testImplicits._
 
@@ -148,6 +150,17 @@ class StandardScalerSuite extends MLTest with DefaultReadWriteTest {
     val newInstance = testDefaultReadWrite(instance)
     assert(newInstance.std === instance.std)
     assert(newInstance.mean === instance.mean)
+  }
+
+  test("pmml export test") {
+    val instance = new StandardScalerModel("myStandardScalerModel",
+      Vectors.dense(1.0, 2.0), Vectors.dense(3.0, 4.0))
+    def checkModel(pmml: PMML): Unit = {
+      assert(pmml.getHeader.getDescription === "standard scaler model")
+      assert(pmml.getModels.size === 2)
+      val model1 = pmml.getModels.get(0).asInstanceOf[BaselineModel]
+    }
+    testPMMLWrite(sc, instance, checkModel)
   }
 
 }

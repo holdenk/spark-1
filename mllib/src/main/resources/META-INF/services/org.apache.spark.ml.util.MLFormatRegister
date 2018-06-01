@@ -3,3 +3,4 @@ org.apache.spark.ml.regression.PMMLLinearRegressionModelWriter
 org.apache.spark.ml.clustering.InternalKMeansModelWriter
 org.apache.spark.ml.clustering.PMMLKMeansModelWriter
 org.apache.spark.ml.feature.InternalStandardScalerModelWriter
+org.apache.spark.ml.feature.PMMLStandardScalerModelWriter

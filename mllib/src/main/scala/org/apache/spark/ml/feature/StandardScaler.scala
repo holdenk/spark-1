@@ -150,7 +150,8 @@ object StandardScaler extends DefaultParamsReadable[StandardScaler] {
  * @param mean Mean of the StandardScalerModel
  */
 @Since("1.2.0")
-class StandardScalerModel private[ml] (
+// TODO(makeprivate again)
+class StandardScalerModel  (
     @Since("1.4.0") override val uid: String,
     @Since("2.0.0") val std: Vector,
     @Since("2.0.0") val mean: Vector)
@@ -234,6 +235,7 @@ private[spark] class PMMLStandardScalerModelWriter extends MLWriterFormat
       val header = new Header()
         .setApplication(app)
         .setTimestamp(timestamp)
+        .setDescription("standard scaler model")
       new PMML("4.2", header, null)
     }
     // Construct our input fields
@@ -245,6 +247,9 @@ private[spark] class PMMLStandardScalerModelWriter extends MLWriterFormat
       dataDictionary.addDataFields(
         new DataField(field, OpType.CONTINUOUS, DataType.DOUBLE))
     }
+    dataDictionary.setNumberOfFields(dataDictionary.getDataFields.size)
+    pmml.setDataDictionary(dataDictionary)
+
     for (i <- 0 until instance.mean.size) {
       val field = fields(i)
       val statType = BaselineTestStatisticType.Z_VALUE
