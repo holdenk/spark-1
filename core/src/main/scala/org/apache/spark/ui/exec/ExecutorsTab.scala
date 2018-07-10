@@ -54,7 +54,7 @@ private[ui] class ExecutorsPage(
   extends WebUIPage("") {
 
   def executorList(): Seq[ExecutorSummary] = {
-    store.executorList(true)
+    store.executorList(false)
   }
 
   def render(request: HttpServletRequest): Seq[Node] = {
