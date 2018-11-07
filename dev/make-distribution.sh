@@ -298,6 +298,6 @@ if [ "$MAKE_TGZ" == "true" ]; then
 fi
 
 if [[ "$TGZ_VERSION" == *-SNAPSHOT ]]; then
-  find ./.dist/local-repo/com/apple/pie/spark/ -name "*.tgz" -exec bash -c 'mv $0 $(echo "$0" | sed -E  "s/-[[:digit:]]+\.[[:digit:]]+-[[:digit:]]+\.tgz/-SNAPSHOT.tgz/" )' '{}' \
+  find ./.dist/local-repo/com/apple/pie/spark/ -name "*.tgz" -exec bash -c 'mv $0 $(echo "$0" | sed -E  "s/-[[:digit:]]+\.[[:digit:]]+-[[:digit:]]+\.tgz/-SNAPSHOT.tgz/" )' '{}' \;
   find ./.dist/local-repo/com/apple/pie/spark/ -name "*.pom" -exec bash -c 'mv $0 $(echo "$0" | sed -E  "s/-[[:digit:]]+\.[[:digit:]]+-[[:digit:]]+\.pom/-SNAPSHOT.pom/" )' '{}' \;
 fi

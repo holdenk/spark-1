@@ -34,6 +34,7 @@ builds:
         SCALA_BINARY_VERSION: "2.11"
         SCALA_VERSION: "2.11.8"
         HADOOP_VERSION: "2.7.3"
+        CODE_VERSION: "2.3.2-pie1.0.0"
     build:
       template: freestyle:v2:release
       steps:
