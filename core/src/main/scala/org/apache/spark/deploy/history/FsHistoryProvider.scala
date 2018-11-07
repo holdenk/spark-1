@@ -348,6 +348,8 @@ private[history] class FsHistoryProvider(conf: SparkConf, clock: Clock)
 
     val loadedUI = LoadedAppUI(ui)
 
+    ui.setAppId(app.id)
+
     synchronized {
       activeUIs((appId, attemptId)) = loadedUI
     }

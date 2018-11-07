@@ -28,10 +28,14 @@ set -o pipefail
 set -e
 set -x
 
+export PATH=$PATH:$JAVA_HOME/bin
+
 # Figure out where the Spark framework is installed
 SPARK_HOME="$(cd "`dirname "$0"`/.."; pwd)"
 DISTDIR="$SPARK_HOME/dist"
 
+WITH_HADOOP=false
+USE_EXISTING_BUILD=false
 MAKE_TGZ=false
 MAKE_PIP=false
 MAKE_R=false
@@ -52,6 +56,15 @@ function exit_with_usage {
 # Parse arguments
 while (( "$#" )); do
   case $1 in
+    --skip-java-test)
+      SKIP_JAVA_TEST=true
+      ;;
+    --use-existing-build)
+      USE_EXISTING_BUILD=true
+      ;;
+    --with-hadoop)
+      WITH_HADOOP=true
+      ;;
     --tgz)
       MAKE_TGZ=true
       ;;
@@ -135,10 +148,26 @@ if [ "$NAME" == "none" ]; then
   NAME=$SPARK_HADOOP_VERSION
 fi
 
+if [[ "$VERSION" == *-SNAPSHOT ]]; then
+    if [ "$WITH_HADOOP" == "false" ]; then
+    	 TGZ_VERSION=`echo $VERSION | sed -e 's/-SNAPSHOT$/-no-hadoop-SNAPSHOT/g'`
+    else
+         TGZ_VERSION=`echo $VERSION | sed -e 's/-SNAPSHOT$/-'$SPARK_HADOOP_VERSION'-SNAPSHOT/g'`
+    fi
+else
+    if [ "$WITH_HADOOP" == "false" ]; then
+    	 TGZ_VERSION="${VERSION}-no-hadoop"
+    else
+         TGZ_VERSION="${VERSION}"
+    fi
+fi
+
+SPARK_DISTRIBUTION_FILE_NAME="spark-distribution_$SCALA_VERSION-$TGZ_VERSION.tgz"
+
 echo "Spark version is $VERSION"
 
 if [ "$MAKE_TGZ" == "true" ]; then
-  echo "Making spark-$VERSION-bin-$NAME.tgz"
+  echo "Making $SPARK_DISTRIBUTION_FILE_NAME"
 else
   echo "Making distribution for Spark $VERSION in '$DISTDIR'..."
 fi
@@ -148,16 +177,21 @@ cd "$SPARK_HOME"
 
 export MAVEN_OPTS="${MAVEN_OPTS:--Xmx2g -XX:ReservedCodeCacheSize=512m}"
 
-# Store the command as an array because $MVN variable might have spaces in it.
-# Normal quoting tricks don't work.
-# See: http://mywiki.wooledge.org/BashFAQ/050
-BUILD_COMMAND=("$MVN" -T 1C clean package -DskipTests $@)
+if [ "$USE_EXISTING_BUILD" == "false" ]; then
+	# Store the command as an array because $MVN variable might have spaces in it.
+	# Normal quoting tricks don't work.
+	# See: http://mywiki.wooledge.org/BashFAQ/050
+	BUILD_COMMAND=("$MVN" -T 1C clean package -DskipTests $@)
 
-# Actually build the jar
-echo -e "\nBuilding with..."
-echo -e "\$ ${BUILD_COMMAND[@]}\n"
+	# Actually build the jar
+	echo -e "\nBuilding with..."
+	echo -e "\$ ${BUILD_COMMAND[@]}\n"
 
-"${BUILD_COMMAND[@]}"
+	"${BUILD_COMMAND[@]}"
+else
+  echo "Using existing build!"
+fi
+
 
 # Make directories
 rm -rf "$DISTDIR"
@@ -267,6 +301,19 @@ if [ "$MAKE_TGZ" == "true" ]; then
   TARDIR="$SPARK_HOME/$TARDIR_NAME"
   rm -rf "$TARDIR"
   cp -r "$DISTDIR" "$TARDIR"
-  tar czf "spark-$VERSION-bin-$NAME.tgz" -C "$SPARK_HOME" "$TARDIR_NAME"
+  tar czf "$SPARK_DISTRIBUTION_FILE_NAME" -C "$SPARK_HOME" "$TARDIR_NAME"
   rm -rf "$TARDIR"
+  LOCAL_REPO_DIR="$SPARK_HOME/.dist/local-repo"
+  mkdir -p "${LOCAL_REPO_DIR}"
+  LOCAL_REPO="file://${LOCAL_REPO_DIR}"
+  "$MVN" deploy:deploy-file -DgroupId="com.apple.pie.spark" -DartifactId="spark-distribution_${SCALA_VERSION}" -Dversion="${TGZ_VERSION}" -Dfile="${SPARK_DISTRIBUTION_FILE_NAME}" -Durl="${LOCAL_REPO}" -Dpackaging=tgz
+fi
+
+if [[ "$TGZ_VERSION" == *-SNAPSHOT ]]; then
+  find ./.dist/local-repo/com/apple/pie/spark/ -name "*.tgz" -exec bash -c 'mv $0 $(echo "$0" | sed -E  "s/-[[:digit:]]+\.[[:digit:]]+-[[:digit:]]+\.tgz/-SNAPSHOT.tgz/" )' '{}' \;
+  find ./.dist/local-repo/com/apple/pie/spark/ -name "*.pom" -exec bash -c 'mv $0 $(echo "$0" | sed -E  "s/-[[:digit:]]+\.[[:digit:]]+-[[:digit:]]+\.pom/-SNAPSHOT.pom/" )' '{}' \;
+fi
+
+if [ "$PUBLISH_JARS" == "false" ]; then
+  find ./.dist/local-repo/com/apple/pie/spark/ \! -name "*spark-distribution*[pom|tgz]" -type f -exec bash -c 'rm $0' '{}' \;
 fi
