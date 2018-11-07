@@ -15,11 +15,12 @@ builds:
         SCALA_BINARY_VERSION: "2.11"
         SCALA_VERSION: "2.11.8"
         HADOOP_VERSION: "2.7.3"
+        PUBLISH_JARS: true
     build:
       template: freestyle:v2:snapshot
       steps:
         - ./dev/rio-maven-custom-build.sh --scala "$SCALA_BINARY_VERSION" --hadoop "$HADOOP_VERSION" --snapshot --maven-opts ""
-        - ./dev/make-distribution.sh --tgz --use-existing-build --skip-java-test -DskipTests=true -Dscala-$SCALA_BINARY_VERSION=enabled -Dhive-thriftserver=enabled -Dscala.version="$SCALA_VERSION" -Dscala.binary.version="$SCALA_BINARY_VERSION" -Dhadoop.version="$HADOOP_VERSION"
+        - ./dev/make-distribution.sh --tgz --use-existing-build --with-hadoop --skip-java-test -DskipTests=true -Dscala-$SCALA_BINARY_VERSION=enabled -Dhive-thriftserver=enabled -Dscala.version="$SCALA_VERSION" -Dscala.binary.version="$SCALA_BINARY_VERSION" -Dhadoop.version="$HADOOP_VERSION"
     publish:
       archives:
         includePattern: .dist/local-repo/**/*.jar, .dist/local-repo/**/*.pom, .dist/local-repo/**/*.tgz, .dist/local-repo/**/*.gz
@@ -34,12 +35,13 @@ builds:
         SCALA_BINARY_VERSION: "2.11"
         SCALA_VERSION: "2.11.8"
         HADOOP_VERSION: "2.7.3"
+        PUBLISH_JARS: true
         CODE_VERSION: "2.3.2-pie1.0.0"
     build:
       template: freestyle:v2:release
       steps:
         - ./dev/rio-maven-custom-build.sh --scala "$SCALA_BINARY_VERSION" --hadoop "$HADOOP_VERSION" --release --maven-opts ""
-        - ./dev/make-distribution.sh --tgz --use-existing-build --skip-java-test -DskipTests=true -Dscala-$SCALA_BINARY_VERSION=enabled -Dhive-thriftserver=enabled -Dscala.version="$SCALA_VERSION" -Dscala.binary.version="$SCALA_BINARY_VERSION" -Dhadoop.version="$HADOOP_VERSION"
+        - ./dev/make-distribution.sh --tgz --use-existing-build --with-hadoop --skip-java-test -DskipTests=true -Dscala-$SCALA_BINARY_VERSION=enabled -Dhive-thriftserver=enabled -Dscala.version="$SCALA_VERSION" -Dscala.binary.version="$SCALA_BINARY_VERSION" -Dhadoop.version="$HADOOP_VERSION"
     publish:
       archives:
         includePattern: .dist/local-repo/**/*.jar, .dist/local-repo/**/*.pom, .dist/local-repo/**/*.tgz, .dist/local-repo/**/*.gz
@@ -49,3 +51,47 @@ builds:
       tag:
         enabled: true
         expression: "releases_2.11/$CODE_VERSION"
+
+  - name: pie-spark-2.11_2.3.2-hadoop-provided-snapshot
+    branchName: pie-spark-2.3.2
+    timeout: 90
+    machine:
+      env:
+        SCALA_BINARY_VERSION: "2.11"
+        SCALA_VERSION: "2.11.8"
+        HADOOP_VERSION: "2.7.3"
+        PUBLISH_JARS: false
+    build:
+      template: freestyle:v2:snapshot
+      steps:
+        - ./dev/rio-maven-custom-build.sh --scala "$SCALA_BINARY_VERSION" --snapshot --maven-opts "" --maven-params "-P hadoop-provided"
+        - ./dev/make-distribution.sh --tgz --use-existing-build --skip-java-test -DskipTests=true -Dscala-$SCALA_BINARY_VERSION=enabled -Dhive-thriftserver=enabled -Dscala.version="$SCALA_VERSION" -Dscala.binary.version="$SCALA_BINARY_VERSION"
+    publish:
+      archives:
+        includePattern: .dist/local-repo/**/*.jar, .dist/local-repo/**/*.pom, .dist/local-repo/**/*.tgz, .dist/local-repo/**/*.gz
+      reports:
+        junit: false
+
+  - name: pie-spark-2.11_2.3.2-hadoop-provided-release
+    branchName: pie-spark-2.3.2-release
+    timeout: 90
+    machine:
+      env:
+        SCALA_BINARY_VERSION: "2.11"
+        SCALA_VERSION: "2.11.8"
+        HADOOP_VERSION: "2.7.3"
+        CODE_VERSION: "2.3.2-pie1.0.0"
+        PUBLISH_JARS: false
+    build:
+      template: freestyle:v2:release
+      steps:
+        - ./dev/rio-maven-custom-build.sh --scala "$SCALA_BINARY_VERSION" --release --maven-opts "" --maven-params "-P hadoop-provided"
+        - ./dev/make-distribution.sh --tgz --use-existing-build --skip-java-test -DskipTests=true -Dscala-$SCALA_BINARY_VERSION=enabled -Dhive-thriftserver=enabled -Dscala.version="$SCALA_VERSION" -Dscala.binary.version="$SCALA_BINARY_VERSION"
+    publish:
+      archives:
+        includePattern: .dist/local-repo/**/*.jar, .dist/local-repo/**/*.pom, .dist/local-repo/**/*.tgz, .dist/local-repo/**/*.gz
+      reports:
+        junit: false
+    finally:
+      tag:
+        enabled: false
