@@ -423,7 +423,7 @@ object SparkHadoopUtil {
 
   def get: SparkHadoopUtil = {
     val jarvisMode = java.lang.Boolean.parseBoolean(
-      System.getProperty("PSPRK_SPARK_JARVIS_MODE", System.getenv("PSPRK_SPARK_JARVIS_MODE")))
+      System.getProperty("INTERNAL_SPARK_JARVIS_MODE", System.getenv("INTERNAL_SPARK_JARVIS_MODE")))
     if (jarvisMode) {
       try {
         Utils.classForName("org.apache.spark.integration.JarvisSparkHadoopUtil")
