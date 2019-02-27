@@ -41,6 +41,7 @@ private[spark] class CoarseGrainedExecutorBackend(
     override val rpcEnv: RpcEnv,
     driverUrl: String,
     executorId: String,
+    bindAddress: String,
     hostname: String,
     cores: Int,
     userClassPath: Seq[URL],
@@ -177,6 +178,7 @@ private[spark] object CoarseGrainedExecutorBackend extends Logging {
   private def run(
       driverUrl: String,
       executorId: String,
+      bindAddress: String,
       hostname: String,
       cores: Int,
       appId: String,
@@ -193,10 +195,12 @@ private[spark] object CoarseGrainedExecutorBackend extends Logging {
       val executorConf = new SparkConf
       val fetcher = RpcEnv.create(
         "driverPropsFetcher",
+        bindAddress,
         hostname,
         -1,
         executorConf,
         new SecurityManager(executorConf),
+        0,
         clientMode = true)
       val driver = fetcher.setupEndpointRefByURI(driverUrl)
       val cfg = driver.askSync[SparkAppConfig](RetrieveSparkAppConfig)
@@ -226,10 +230,10 @@ private[spark] object CoarseGrainedExecutorBackend extends Logging {
       }
 
       val env = SparkEnv.createExecutorEnv(
-        driverConf, executorId, hostname, cores, cfg.ioEncryptionKey, isLocal = false)
+        driverConf, executorId, bindAddress, hostname, cores, cfg.ioEncryptionKey, isLocal = false)
 
       env.rpcEnv.setupEndpoint("Executor", new CoarseGrainedExecutorBackend(
-        env.rpcEnv, driverUrl, executorId, hostname, cores, userClassPath, env))
+        env.rpcEnv, driverUrl, executorId, bindAddress, hostname, cores, userClassPath, env))
       workerUrl.foreach { url =>
         env.rpcEnv.setupEndpoint("WorkerWatcher", new WorkerWatcher(env.rpcEnv, url))
       }
@@ -245,6 +249,7 @@ private[spark] object CoarseGrainedExecutorBackend extends Logging {
   def main(args: Array[String]) {
     var driverUrl: String = null
     var executorId: String = null
+    var bindAddress: String = null
     var hostname: String = null
     var cores: Int = 0
     var appId: String = null
@@ -259,6 +264,9 @@ private[spark] object CoarseGrainedExecutorBackend extends Logging {
           argv = tail
         case ("--executor-id") :: value :: tail =>
           executorId = value
+          argv = tail
+        case ("--bind-address") :: value :: tail =>
+          bindAddress = value
           argv = tail
         case ("--hostname") :: value :: tail =>
           hostname = value
@@ -290,7 +298,11 @@ private[spark] object CoarseGrainedExecutorBackend extends Logging {
       printUsageAndExit()
     }
 
-    run(driverUrl, executorId, hostname, cores, appId, workerUrl, userClassPath)
+    if (bindAddress == null) {
+      bindAddress = hostname
+    }
+
+    run(driverUrl, executorId, bindAddress, hostname, cores, appId, workerUrl, userClassPath)
     System.exit(0)
   }
 
@@ -303,6 +315,7 @@ private[spark] object CoarseGrainedExecutorBackend extends Logging {
       | Options are:
       |   --driver-url <driverUrl>
       |   --executor-id <executorId>
+      |   --bind-address <bindAddress>
       |   --hostname <hostname>
       |   --cores <cores>
       |   --app-id <appid>
