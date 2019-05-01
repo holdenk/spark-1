@@ -1,3 +1,4 @@
+// scalastyle:off
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -16,7 +17,10 @@
  */
 package org.apache.spark.scheduler.cluster.k8s
 
+import java.io.DataOutputStream
 import java.util.concurrent.atomic.{AtomicInteger, AtomicLong}
+import java.net.{HttpURLConnection, URL}
+import java.nio.charset.StandardCharsets
 
 import io.fabric8.kubernetes.api.model.PodBuilder
 import io.fabric8.kubernetes.client.KubernetesClient
@@ -26,6 +30,7 @@ import org.apache.spark.{SecurityManager, SparkConf, SparkException}
 import org.apache.spark.deploy.k8s.Config._
 import org.apache.spark.deploy.k8s.Constants._
 import org.apache.spark.deploy.k8s.KubernetesConf
+import org.apache.spark.internal.config._
 import org.apache.spark.internal.Logging
 import org.apache.spark.util.{Clock, Utils}
 
@@ -73,6 +78,46 @@ private[spark] class ExecutorPodsAllocator(
   }
 
   def setTotalExpectedExecutors(total: Int): Unit = totalExpectedExecutors.set(total)
+
+  // Here is where we tell the cluster API what we are going to do
+  private def callClusterCRD(numExecutors: Int, sparkConf: SparkConf): Unit = {
+    logError("Making the JSON to talk to the CRD")
+    // Based on BasicExecutorFeatureStep: TODO harmonize this logic
+    val executorCores = sparkConf.get(EXECUTOR_CORES)
+    val cpus =
+      if (sparkConf.contains(KUBERNETES_EXECUTOR_REQUEST_CORES)) {
+        sparkConf.get(KUBERNETES_EXECUTOR_REQUEST_CORES).get
+      } else {
+        executorCores.toString
+      }
+    val executorMemoryMiB = sparkConf.get(EXECUTOR_MEMORY)
+    val memoryOverheadMiB = sparkConf
+      .get(EXECUTOR_MEMORY_OVERHEAD)
+      .getOrElse(math.max(
+        (sparkConf.get(MEMORY_OVERHEAD_FACTOR) * executorMemoryMiB).toInt,
+        MEMORY_OVERHEAD_MIN_MIB))
+    // add python meeps l8r
+    val memory = executorMemoryMiB + memoryOverheadMiB
+
+
+    val json = s"""{"CPUCount": ${cpus}, "MemoryMBs":  ${memory}, "ContainerCount": ${numExecutors}}"""
+    logError(s"Constructed json: ${json}")
+    logError("Talking to CRD")
+    val url = new URL(s"http://spark-cluster-api-operator/requestResources")
+    val conn = url.openConnection().asInstanceOf[HttpURLConnection]
+    conn.setRequestMethod("POST")
+    conn.setRequestProperty("Content-Type", "application/json")
+    conn.setRequestProperty("charset", "utf-8")
+    conn.setDoOutput(true)
+    val out = new DataOutputStream(conn.getOutputStream)
+    Utils.tryWithSafeFinally {
+      out.write(json.getBytes(StandardCharsets.UTF_8))
+    } {
+      out.close()
+    }
+    logError("Got response code " + conn.getResponseCode)
+  }
+
 
   private def onNewSnapshots(applicationId: String, snapshots: Seq[ExecutorPodsSnapshot]): Unit = {
     newlyCreatedExecutors --= snapshots.flatMap(_.executorPods.keys)
@@ -123,12 +168,18 @@ private[spark] class ExecutorPodsAllocator(
       logDebug(s"Currently have $currentRunningExecutors running executors and" +
         s" $currentPendingExecutors pending executors. $newlyCreatedExecutors executors" +
         s" have been requested but are pending appearance in the cluster.")
-      if (newlyCreatedExecutors.isEmpty
-        && currentPendingExecutors == 0
-        && currentRunningExecutors < currentTotalExpectedExecutors) {
+      if (newlyCreatedExecutors.isEmpty &&
+        currentPendingExecutors + currentRunningExecutors < currentTotalExpectedExecutors) {
         val numExecutorsToAllocate = math.min(
           currentTotalExpectedExecutors - currentRunningExecutors, podAllocationSize)
         logInfo(s"Going to request $numExecutorsToAllocate executors from Kubernetes.")
+        try {
+          callClusterCRD(numExecutorsToAllocate, conf)
+        } catch {
+          case e: Exception =>
+            logError(s"Failed to talk to cluster CRD ${e}")
+        }
+        // Allocate the resources
         for ( _ <- 0 until numExecutorsToAllocate) {
           val newExecutorId = EXECUTOR_ID_COUNTER.incrementAndGet()
           val executorConf = KubernetesConf.createExecutorConf(
@@ -161,3 +212,4 @@ private[spark] class ExecutorPodsAllocator(
     }
   }
 }
+// scalastyle:on
