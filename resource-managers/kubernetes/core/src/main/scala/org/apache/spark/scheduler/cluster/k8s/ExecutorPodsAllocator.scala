@@ -83,7 +83,7 @@ private[spark] class ExecutorPodsAllocator(
   private def callClusterCRD(numExecutors: Int, sparkConf: SparkConf): Unit = {
     logError("Making the JSON to talk to the CRD")
     // Based on BasicExecutorFeatureStep: TODO harmonize this logic
-    val executorCores = sparkConf.get(EXECUTOR_CORES)
+    val executorCores = numExecutors * sparkConf.get(EXECUTOR_CORES)
     val cpus =
       if (sparkConf.contains(KUBERNETES_EXECUTOR_REQUEST_CORES)) {
         sparkConf.get(KUBERNETES_EXECUTOR_REQUEST_CORES).get
@@ -97,7 +97,7 @@ private[spark] class ExecutorPodsAllocator(
         (sparkConf.get(MEMORY_OVERHEAD_FACTOR) * executorMemoryMiB).toInt,
         MEMORY_OVERHEAD_MIN_MIB))
     // add python meeps l8r
-    val memory = executorMemoryMiB + memoryOverheadMiB
+    val memory = numExecutors * (executorMemoryMiB + memoryOverheadMiB)
 
 
     val json = s"""{"CPUCount": ${cpus}, "MemoryMBs":  ${memory}, "ContainerCount": ${numExecutors}}"""
