@@ -337,16 +337,16 @@ $(document).ready(function () {
           $("#additionalMetrics").click(function(){
               $("#arrowtoggle1").toggleClass("arrow-open arrow-closed");
               $("#toggle-metrics").toggle();
-              if (window.localStorage) {
-                  window.localStorage.setItem("arrowtoggle1class", $("#arrowtoggle1").attr('class'));
+              if (DB) {
+                  DB.setItem("arrowtoggle1class", $("#arrowtoggle1").attr('class'));
               }
           });
 
           $("#aggregatedMetrics").click(function(){
               $("#arrowtoggle2").toggleClass("arrow-open arrow-closed");
               $("#toggle-aggregatedMetrics").toggle();
-              if (window.localStorage) {
-                  window.localStorage.setItem("arrowtoggle2class", $("#arrowtoggle2").attr('class'));
+              if (DB) {
+                  DB.setItem("arrowtoggle2class", $("#arrowtoggle2").attr('class'));
               }
           });
 
@@ -970,14 +970,14 @@ $(document).ready(function () {
                 taskTableSelector.column(24).visible(dataToShow.showBytesSpilledData);
                 taskTableSelector.column(25).visible(dataToShow.showBytesSpilledData);
 
-                if (window.localStorage) {
-                    if (window.localStorage.getItem("arrowtoggle1class") !== null &&
-                        window.localStorage.getItem("arrowtoggle1class").includes("arrow-open")) {
+                if (DB) {
+                    if (DB.getItem("arrowtoggle1class") !== null &&
+                        DB.getItem("arrowtoggle1class").includes("arrow-open")) {
                         $("#arrowtoggle1").toggleClass("arrow-open arrow-closed");
                         $("#toggle-metrics").toggle();
                     }
-                    if (window.localStorage.getItem("arrowtoggle2class") !== null &&
-                        window.localStorage.getItem("arrowtoggle2class").includes("arrow-open")) {
+                    if (DB.getItem("arrowtoggle2class") !== null &&
+                        DB.getItem("arrowtoggle2class").includes("arrow-open")) {
                         $("#arrowtoggle2").toggleClass("arrow-open arrow-closed");
                         $("#toggle-aggregatedMetrics").toggle();
                     }
