@@ -378,6 +378,7 @@ private[history] class FsHistoryProvider(conf: SparkConf, clock: Clock)
     loadPlugins().toSeq.sortBy(_.displayOrder).foreach(_.setupUI(ui))
 
     val loadedUI = LoadedAppUI(ui)
+    ui.setAppId(app.id)
     synchronized {
       activeUIs((appId, attemptId)) = loadedUI
     }
