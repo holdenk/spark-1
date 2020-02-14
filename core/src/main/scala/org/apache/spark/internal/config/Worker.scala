@@ -82,4 +82,9 @@ private[spark] object Worker {
       .version("2.0.2")
       .intConf
       .createWithDefault(100)
+
+  private[spark] val WORKER_DECOMMISSION_ENABLED =
+    ConfigBuilder("spark.worker.decommission.enabled")
+      .booleanConf
+      .createWithDefault(false)
 }
