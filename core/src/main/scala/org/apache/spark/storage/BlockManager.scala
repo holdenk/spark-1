@@ -1285,6 +1285,9 @@ private[spark] class BlockManager(
 
     require(blockId != null, "BlockId is null")
     require(level != null && level.isValid, "StorageLevel is null or invalid")
+    if (blockManagerDecommissioning && blockId.isRDD) {
+      throw new RDDBlockSavedOnDecommissionedBlockManagerException(blockId.asRDDId.get)
+    }
 
     val putBlockInfo = {
       val newInfo = new BlockInfo(level, classTag, tellMaster)
@@ -1590,6 +1593,7 @@ private[spark] class BlockManager(
         releaseLockAndDispose(blockId, data)
       }
     }
+    replicatedSuccessfully
   }
 
   /**
@@ -1921,12 +1925,11 @@ private[spark] class BlockManager(
         }
       }
     }
-    blockReplicationThread.setDaemon(true)
-    blockReplicationThread.setName("block-replication-thread")
+    cacheReplicationThread.setDaemon(true)
+    cacheReplicationThread.setName("cache-replication-thread")
 
     def start(): Unit = {
-      logInfo("Starting block replication thread")
-      blockReplicationThread.start()
+      cacheReplicationThread.start()
     }
 
     def stop(): Unit = {
