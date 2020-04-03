@@ -152,7 +152,7 @@ private[spark] class IndexShuffleBlockResolver(
    * Write the provided shuffle index stream to the disk manager's local output.
    * This is for shuffle block migration.
    */
-  def putIndexAsStream(shuffleId: Int, map: Long) {
+  def putIndexAsStream(shuffleId: Int, mapId: Long) {
     val file = getIndexFile(shuffleId, mapId)
   }
 
@@ -160,7 +160,7 @@ private[spark] class IndexShuffleBlockResolver(
    * Write the provided data file stream to the disk manager's local output.
    * This is for shuffle block migration.
    */
-  def putDataAsStream(shuffleId: Int, map: Long) {
+  def putDataAsStream(shuffleId: Int, mapId: Long) {
     val file = getDataFile(shuffleId, mapId)
   }
 
