@@ -149,6 +149,23 @@ private[spark] class IndexShuffleBlockResolver(
   }
 
   /**
+   * Write the provided shuffle index stream to the disk manager's local output.
+   * This is for shuffle block migration.
+   */
+  def putIndexAsStream(shuffleId: Int, map: Long) {
+    val file = getIndexFile(shuffleId, mapId)
+  }
+
+  /**
+   * Write the provided data file stream to the disk manager's local output.
+   * This is for shuffle block migration.
+   */
+  def putDataAsStream(shuffleId: Int, map: Long) {
+    val file = getDataFile(shuffleId, mapId)
+  }
+
+
+  /**
    * Write an index file with the offsets of each block, plus a final offset at the end for the
    * end of the output file. This will be used by getBlockData to figure out where each block
    * begins and ends.
