@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
+// scalastyle:off println
 package org.apache.spark.storage
 
 import scala.collection.generic.CanBuildFrom
@@ -88,6 +88,7 @@ class BlockManagerMaster(
     val res = driverEndpoint.askSync[Boolean](
       UpdateBlockInfo(blockManagerId, blockId, storageLevel, memSize, diskSize))
     logDebug(s"Updated info of block $blockId")
+    println(s"Updated info of block $blockId which is ${blockId.isShuffle}")
     res
   }
 

@@ -28,7 +28,7 @@ import scala.util.Random
 
 import com.google.common.cache.CacheBuilder
 
-import org.apache.spark.SparkConf
+import org.apache.spark.{MapOutputTrackerMaster, SparkConf}
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.internal.{config, Logging}
 import org.apache.spark.network.shuffle.ExternalBlockStoreClient
@@ -41,6 +41,7 @@ import org.apache.spark.util.{RpcUtils, ThreadUtils, Utils}
  * BlockManagerMasterEndpoint is an [[IsolatedRpcEndpoint]] on the master node to track statuses
  * of all slaves' block managers.
  */
+// scalastyle:off println
 private[spark]
 class BlockManagerMasterEndpoint(
     override val rpcEnv: RpcEnv,
@@ -48,7 +49,8 @@ class BlockManagerMasterEndpoint(
     conf: SparkConf,
     listenerBus: LiveListenerBus,
     externalBlockStoreClient: Option[ExternalBlockStoreClient],
-    blockManagerInfo: mutable.Map[BlockManagerId, BlockManagerInfo])
+    blockManagerInfo: mutable.Map[BlockManagerId, BlockManagerInfo],
+    mapOutputTracker: MapOutputTrackerMaster)
   extends IsolatedRpcEndpoint with Logging {
 
   // Mapping from executor id to the block manager's local disk directories.
@@ -490,6 +492,7 @@ class BlockManagerMasterEndpoint(
       storageLevel: StorageLevel,
       memSize: Long,
       diskSize: Long): Boolean = {
+    println(s"Updating block info on master ${blockId} of type ${blockId.isShuffle}")
 
     if (!blockManagerInfo.contains(blockManagerId)) {
       if (blockManagerId.isDriver && !isLocal) {
@@ -504,6 +507,16 @@ class BlockManagerMasterEndpoint(
     if (blockId == null) {
       blockManagerInfo(blockManagerId).updateLastSeenMs()
       return true
+    }
+
+    if (blockId.isShuffle) {
+      blockId match {
+        case ShuffleBlockId(shuffleId: Int, mapId: Long, reduceId: Int) =>
+          mapOutputTracker.updateMapOutput(shuffleId, mapId, blockManagerId)
+          return true
+        case _ =>
+          logError(s"Unexpected shuffle block ${blockId}")
+      }
     }
 
     blockManagerInfo(blockManagerId).updateBlockInfo(blockId, storageLevel, memSize, diskSize)
