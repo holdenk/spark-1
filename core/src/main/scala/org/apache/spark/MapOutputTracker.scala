@@ -122,6 +122,17 @@ private class ShuffleStatus(numPartitions: Int) {
   }
 
   /**
+   * Update the map output location (e.g. during migration).
+   */
+  def updateMapOutput(mapId: Long, bmAddress: BlockManagerId): Unit = withWriteLock {
+    val mapStatusOpt = mapStatuses.find(_.mapId == mapId)
+    mapStatusOpt.foreach{mapStatus =>
+      mapStatus.updateLocation(bmAddress)
+      invalidateSerializedMapOutputStatusCache()
+    }
+  }
+
+  /**
    * Remove the map output which was served by the specified block manager.
    * This is a no-op if there is no registered map output or if the registered output is from a
    * different block manager.
@@ -477,6 +488,10 @@ private[spark] class MapOutputTrackerMaster(
     if (shuffleStatuses.put(shuffleId, new ShuffleStatus(numMaps)).isDefined) {
       throw new IllegalArgumentException("Shuffle ID " + shuffleId + " registered twice")
     }
+  }
+
+  def updateMapOutput(shuffleId: Int, mapId: Long, bmAddress: BlockManagerId): Unit = {
+    shuffleStatuses(shuffleId).updateMapOutput(mapId, bmAddress)
   }
 
   def registerMapOutput(shuffleId: Int, mapIndex: Int, status: MapStatus): Unit = {

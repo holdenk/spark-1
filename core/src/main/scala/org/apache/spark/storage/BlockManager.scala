@@ -1593,7 +1593,6 @@ private[spark] class BlockManager(
         releaseLockAndDispose(blockId, data)
       }
     }
-    replicatedSuccessfully
   }
 
   /**
@@ -1905,7 +1904,7 @@ private[spark] class BlockManager(
    */
   private class BlockManagerDecommissionManager(conf: SparkConf) {
     @volatile private var stopped = false
-    private val blockReplicationThread = new Thread {
+    private val cacheReplicationThread = new Thread {
       override def run(): Unit = {
         while (blockManagerDecommissioning && !stopped) {
           try {
@@ -1936,8 +1935,8 @@ private[spark] class BlockManager(
       if (!stopped) {
         stopped = true
         logInfo("Stopping block replication thread")
-        blockReplicationThread.interrupt()
-        blockReplicationThread.join()
+        cacheReplicationThread.interrupt()
+        cacheReplicationThread.join()
       }
     }
   }
