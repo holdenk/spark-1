@@ -53,6 +53,7 @@ import org.apache.spark.network.util.TransportConf
 import org.apache.spark.rpc.RpcEnv
 import org.apache.spark.scheduler.ExecutorCacheTaskLocation
 import org.apache.spark.serializer.{SerializerInstance, SerializerManager}
+import org.apache.spark.shuffle.{IndexShuffleBlockResolver, ShuffleManager, ShuffleWriteMetricsReporter}
 import org.apache.spark.shuffle.{ShuffleManager, ShuffleWriteMetricsReporter}
 import org.apache.spark.storage.BlockManagerMessages.ReplicateBlock
 import org.apache.spark.storage.memory._
@@ -253,6 +254,10 @@ private[spark] class BlockManager(
   private val maxRemoteBlockToMem = conf.get(config.MAX_REMOTE_BLOCK_SIZE_FETCH_TO_MEM)
 
   var hostLocalDirManager: Option[HostLocalDirManager] = None
+
+  private lazy val indexShuffleResolver: IndexShuffleBlockResolver = {
+    shuffleManager.shuffleBlockResolver.asInstanceOf[IndexShuffleBlockResolver]
+  }
 
   /**
    * Abstraction for storing blocks from bytes, whether they start in memory or on disk.
@@ -649,7 +654,18 @@ private[spark] class BlockManager(
   override def putBlockDataAsStream(
       blockId: BlockId,
       level: StorageLevel,
-      classTag: ClassTag[_]): StreamCallbackWithID = {
+    classTag: ClassTag[_]): StreamCallbackWithID = {
+    // Delegate shuffle blocks here to resolver if supported
+    if (blockId.isShuffle || blockId.isInternalShuffle) {
+      try {
+        return indexShuffleResolver.putShuffleBlockAsStream(blockId, serializerManager)
+      } catch {
+        case e: ClassCastException => throw new Exception(
+          s"Unexpected shuffle block ${blockId} with unsupported shuffle " +
+          s"resolver ${shuffleManager.shuffleBlockResolver}")
+      }
+    }
+    // All other blocks
     val (_, tmpFile) = diskBlockManager.createTempLocalBlock()
     val channel = new CountingWritableChannel(
       Channels.newChannel(serializerManager.wrapForEncryption(new FileOutputStream(tmpFile))))

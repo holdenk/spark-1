@@ -18,6 +18,7 @@
 package org.apache.spark.shuffle
 
 import java.io._
+import java.nio.ByteBuffer
 import java.nio.channels.Channels
 import java.nio.file.Files
 
@@ -25,8 +26,10 @@ import org.apache.spark.{SparkConf, SparkEnv}
 import org.apache.spark.internal.Logging
 import org.apache.spark.io.NioBufferedFileInputStream
 import org.apache.spark.network.buffer.{FileSegmentManagedBuffer, ManagedBuffer}
+import org.apache.spark.network.client.StreamCallbackWithID
 import org.apache.spark.network.netty.SparkTransportConf
 import org.apache.spark.network.shuffle.ExecutorDiskUtils
+import org.apache.spark.serializer.SerializerManager
 import org.apache.spark.shuffle.IndexShuffleBlockResolver.NOOP_REDUCE_ID
 import org.apache.spark.storage._
 import org.apache.spark.util.Utils
@@ -149,19 +152,55 @@ private[spark] class IndexShuffleBlockResolver(
   }
 
   /**
-   * Write the provided shuffle index stream to the disk manager's local output.
-   * This is for shuffle block migration.
+   * Write a provided shuffle block as a stream. Used for block migrations.
+   * ShuffleBlockBatchIds must contain the full range represented in the ShuffleIndexBlock.
+   * Requires the caller to delete any shuffle index blocks where the shuffle block fails to
+   * put.
    */
-  def putIndexAsStream(shuffleId: Int, mapId: Long) {
-    val file = getIndexFile(shuffleId, mapId)
-  }
+  def putShuffleBlockAsStream(blockId: BlockId, serializerManager: SerializerManager):
+      StreamCallbackWithID = {
+    val file = blockId match {
+      case ShuffleIndexBlockId(shuffleId, mapId, _) =>
+        getIndexFile(shuffleId, mapId)
+      case ShuffleBlockBatchId(shuffleId, mapId, _, _) =>
+        getDataFile(shuffleId, mapId)
+      case _ =>
+        throw new Exception(s"Unexpected shuffle block transfer ${blockId}")
+    }
+    val fileTmp = Utils.tempFileWith(file)
+    val channel = Channels.newChannel(
+      serializerManager.wrapStream(blockId,
+        new FileOutputStream(fileTmp)))
 
-  /**
-   * Write the provided data file stream to the disk manager's local output.
-   * This is for shuffle block migration.
-   */
-  def putDataAsStream(shuffleId: Int, mapId: Long) {
-    val file = getDataFile(shuffleId, mapId)
+    new StreamCallbackWithID {
+
+      override def getID: String = blockId.name
+
+      override def onData(streamId: String, buf: ByteBuffer): Unit = {
+        while (buf.hasRemaining) {
+          channel.write(buf)
+        }
+      }
+
+      override def onComplete(streamId: String): Unit = {
+        logTrace(s"Done receiving block $blockId, now putting into local shuffle service")
+        channel.close()
+        this.synchronized {
+          if (file.exists()) {
+            file.delete()
+          }
+          if (!fileTmp.renameTo(file)) {
+            throw new IOException(s"fail to rename file ${fileTmp} to ${file}")
+          }
+        }
+      }
+
+      override def onFailure(streamId: String, cause: Throwable): Unit = {
+        // the framework handles the connection itself, we just need to do local cleanup
+        channel.close()
+        fileTmp.delete()
+      }
+    }
   }
 
 
@@ -186,7 +225,7 @@ private[spark] class IndexShuffleBlockResolver(
       val dataFile = getDataFile(shuffleId, mapId)
       // There is only one IndexShuffleBlockResolver per executor, this synchronization make sure
       // the following check and rename are atomic.
-      synchronized {
+      this.synchronized {
         val existingLengths = checkIndexAndDataFile(indexFile, dataFile, lengths.length)
         if (existingLengths != null) {
           // Another attempt for the same task has already written our map outputs successfully,
