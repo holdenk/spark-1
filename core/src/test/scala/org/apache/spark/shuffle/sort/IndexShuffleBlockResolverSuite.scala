@@ -48,6 +48,7 @@ class IndexShuffleBlockResolverSuite extends SparkFunSuite with BeforeAndAfterEa
     when(blockManager.diskBlockManager).thenReturn(diskBlockManager)
     when(diskBlockManager.getFile(any[BlockId])).thenAnswer(
       (invocation: InvocationOnMock) => new File(tempDir, invocation.getArguments.head.toString))
+    when(diskBlockManager.localDirs).thenReturn(Array(tempDir))
   }
 
   override def afterEach(): Unit = {

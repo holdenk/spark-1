@@ -63,7 +63,7 @@ private[spark] class IndexShuffleBlockResolver(
    */
   def getStoredShuffles(): Set[(Int, Long)] = {
     // Matches ShuffleIndexBlockId name
-    val pattern = "shuffle_(\\d+)_(\\d+))_(\\d+)\\.index".r
+    val pattern = "shuffle_(\\d+)_(\\d+)_.+\\.index".r
     val fileNames = blockManager.diskBlockManager.localDirs.flatMap(_.list())
     fileNames.flatMap{ fname =>
       pattern.findAllIn(fname).matchData.map {
