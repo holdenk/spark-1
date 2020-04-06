@@ -59,6 +59,21 @@ private[spark] class IndexShuffleBlockResolver(
   def getDataFile(shuffleId: Int, mapId: Long): File = getDataFile(shuffleId, mapId, None)
 
   /**
+   * Get the shuffle files that are stored locally. Used for block migrations.
+   */
+  def getStoredShuffles(): Set[(Int, Long)] = {
+    // Matches ShuffleIndexBlockId name
+    val pattern = "shuffle_(\\d+)_(\\d+))_(\\d+)\\.index".r
+    val fileNames = blockManager.diskBlockManager.localDirs.flatMap(_.list())
+    fileNames.flatMap{ fname =>
+      pattern.findAllIn(fname).matchData.map {
+        matched => (matched.group(1).toInt, matched.group(2).toLong)
+      }
+    }.toSet
+  }
+
+
+  /**
    * Get the shuffle data file.
    *
    * When the dirs parameter is None then use the disk manager's local directories. Otherwise,
