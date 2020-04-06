@@ -49,7 +49,7 @@ import org.apache.spark.util._
  *
  * All public methods of this class are thread-safe.
  */
-private class ShuffleStatus(numPartitions: Int) {
+private class ShuffleStatus(numPartitions: Int) extends Logging {
 
   private val (readLock, writeLock) = {
     val lock = new ReentrantReadWriteLock()
@@ -126,9 +126,12 @@ private class ShuffleStatus(numPartitions: Int) {
    */
   def updateMapOutput(mapId: Long, bmAddress: BlockManagerId): Unit = withWriteLock {
     val mapStatusOpt = mapStatuses.find(_.mapId == mapId)
-    mapStatusOpt.foreach{mapStatus =>
-      mapStatus.updateLocation(bmAddress)
-      invalidateSerializedMapOutputStatusCache()
+    mapStatusOpt match {
+      case Some(mapStatus) =>
+        mapStatus.updateLocation(bmAddress)
+        invalidateSerializedMapOutputStatusCache()
+      case None =>
+        logError("Asked to update map output ${mapId} for untracked map status.")
     }
   }
 
@@ -491,7 +494,10 @@ private[spark] class MapOutputTrackerMaster(
   }
 
   def updateMapOutput(shuffleId: Int, mapId: Long, bmAddress: BlockManagerId): Unit = {
-    shuffleStatuses(shuffleId).updateMapOutput(mapId, bmAddress)
+    shuffleStatuses.get(shuffleId) match {
+      case Some(shuffleStatus) => shuffleStatus.updateMapOutput(mapId, bmAddress)
+      case None => logError("Asked to update map output for unknown shuffle ${shuffleId}")
+    }
   }
 
   def registerMapOutput(shuffleId: Int, mapIndex: Int, status: MapStatus): Unit = {

@@ -73,6 +73,7 @@ class IndexShuffleBlockResolverSuite extends SparkFunSuite with BeforeAndAfterEa
     }
     resolver.writeIndexFileAndCommit(shuffleId, mapId, lengths, dataTmp)
 
+    val storedShuffles = resolver.getStoredShuffles()
     val indexFile = new File(tempDir.getAbsolutePath, idxName)
     val dataFile = resolver.getDataFile(shuffleId, mapId)
 
@@ -81,6 +82,7 @@ class IndexShuffleBlockResolverSuite extends SparkFunSuite with BeforeAndAfterEa
     assert(dataFile.exists())
     assert(dataFile.length() === 30)
     assert(!dataTmp.exists())
+    assert(storedShuffles === Set((1, 2)))
 
     val lengths2 = new Array[Long](3)
     val dataTmp2 = File.createTempFile("shuffle", null, tempDir)

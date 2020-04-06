@@ -493,6 +493,7 @@ class BlockManagerMasterEndpoint(
       memSize: Long,
       diskSize: Long): Boolean = {
     println(s"Updating block info on master ${blockId} of type ${blockId.isShuffle}")
+    println(s"Storage level is ${storageLevel}")
 
     if (!blockManagerInfo.contains(blockManagerId)) {
       if (blockManagerId.isDriver && !isLocal) {
@@ -509,13 +510,12 @@ class BlockManagerMasterEndpoint(
       return true
     }
 
-    if (blockId.isShuffle) {
+    if (blockId.isShuffle && storageLevel.isValid) {
       blockId match {
         case ShuffleBlockId(shuffleId: Int, mapId: Long, reduceId: Int) =>
           mapOutputTracker.updateMapOutput(shuffleId, mapId, blockManagerId)
-          return true
         case _ =>
-          logError(s"Unexpected shuffle block ${blockId}")
+          logError(s"Unexpected shuffle block type ${blockId}")
       }
     }
 
