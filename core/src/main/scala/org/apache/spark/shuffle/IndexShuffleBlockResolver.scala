@@ -218,6 +218,25 @@ private[spark] class IndexShuffleBlockResolver(
     }
   }
 
+  /**
+   * Get the index & data block for migration.
+   */
+  def getMigrationBlocks(shuffleId: Int, mapId: Long): ((BlockId, ManagedBuffer), (BlockId, ManagedBuffer)) = {
+    // Load the index block
+    val indexFile = getIndexFile(shuffleId, mapId)
+    val indexBlockId = ShuffleIndexBlockId(shuffleId, mapId, 0)
+    val indexFileSize = indexFile.length()
+    val indexBlockData = new FileSegmentManagedBuffer(transportConf, indexFile, 0, indexFileSize)
+
+    // Find the end reduce ID
+    val endReduceId = (indexFileSize / 8) - 1
+    // Load the data block
+    val dataFile = getDataFile(shuffleId, mapId)
+    val dataBlockId = ShuffleBlockBatchId(shuffleId, mapId, 0, endReduceId.toInt)
+    val dataBlockData = new FileSegmentManagedBuffer(transportConf, dataFile, 0, dataFile.length())
+    ((indexBlockId, indexBlockData), (dataBlockId, dataBlockData))
+  }
+
 
   /**
    * Write an index file with the offsets of each block, plus a final offset at the end for the
