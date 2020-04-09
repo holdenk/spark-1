@@ -648,6 +648,7 @@ private[spark] class BlockManager(
       data: ManagedBuffer,
       level: StorageLevel,
       classTag: ClassTag[_]): Boolean = {
+    println(s"Putting block data ${blockId} w/ buffer")
     putBytes(blockId, new ChunkedByteBuffer(data.nioByteBuffer()), level)(classTag)
   }
 
@@ -655,6 +656,7 @@ private[spark] class BlockManager(
       blockId: BlockId,
       level: StorageLevel,
       classTag: ClassTag[_]): StreamCallbackWithID = {
+    println(s"Putting block data ${blockId} w/ stream")
     // Delegate shuffle blocks here to resolver if supported
     if (blockId.isShuffle || blockId.isInternalShuffle) {
       println("Putting shuffle block ${blockId}")
@@ -738,7 +740,7 @@ private[spark] class BlockManager(
    * it is still valid). This ensures that update in master will compensate for the increase in
    * memory on slave.
    */
-  private def reportBlockStatus(
+  private[spark] def reportBlockStatus(
       blockId: BlockId,
       status: BlockStatus,
       droppedMemorySize: Long = 0L): Unit = {
@@ -1798,6 +1800,8 @@ private[spark] class BlockManager(
 
   def decommissionBlockManager(): Unit = {
     if (!blockManagerDecommissioning) {
+      println("Starting block manager decommissioning process")
+      throw new Exception("fuck")
       logInfo("Starting block manager decommissioning process")
       blockManagerDecommissioning = true
       decommissionManager = Some(new BlockManagerDecommissionManager(conf))
@@ -1815,26 +1819,38 @@ private[spark] class BlockManager(
    * Requires an Indexed based shuffle resolver.
    */
   def offloadShuffleBlocks(): Unit = {
+    println("Offloading shuffle blocks")
     val localShuffles = indexShuffleResolver.getStoredShuffles()
     val shufflesToMigrate = localShuffles.&~(migratedShuffles).toSeq
     val peers = getPeers(false)
     // If we have less shuffles than peers use the local ones first.
     // Only transfer one shuffle at a time per host.
     // Future TODO: Use a worker/producer model to migrate blocks with less blocking.
-    val targetHosts: Seq[BlockManagerId] = if (peers.size < shufflesToMigrate.size) {
+    val targetPeers: Seq[BlockManagerId] = if (peers.size < shufflesToMigrate.size) {
       sortLocations(getPeers(false))
     } else {
       peers
     }
-    val shufflesToHosts: Seq[((Int, Long), BlockManagerId)] = shufflesToMigrate.zip(targetHosts)
-    val migrated = shufflesToHosts.par.flatMap{ case ((shuffleId, mapId), targetHost) =>
-      try {
-        Some(1)
-      } catch {
-        case e: Exception =>
-          logError("Failed to replicate ${shuffleId},${mapId} to ${host}")
-          None
-      }
+    val shufflesToPeers: Seq[((Int, Long), BlockManagerId)] = shufflesToMigrate.zip(targetPeers)
+    val migrated = shufflesToPeers.par.flatMap{ case ((shuffleId, mapId), peer) =>
+//      try {
+        val ((indexBlockId, indexBuffer), (dataBlockId, dataBuffer)) =
+          indexShuffleResolver.getMigrationBlocks(shuffleId, mapId)
+        blockTransferService.uploadBlockSync(
+          peer.host,
+          peer.port,
+          peer.executorId,
+          indexBlockId,
+          indexBuffer,
+          null,// storage level, TODO fix
+          null)// class tag, we don't need for shuffle
+        Some((shuffleId, mapId))
+//      } catch {
+//        case e: Exception =>
+// TODO: Delete block
+//          logError("Failed to replicate ${shuffleId},${mapId} to ${host}")
+//          None
+//      }
     }
   }
 

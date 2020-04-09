@@ -200,6 +200,7 @@ private[spark] class IndexShuffleBlockResolver(
       override def onComplete(streamId: String): Unit = {
         logTrace(s"Done receiving block $blockId, now putting into local shuffle service")
         channel.close()
+        val diskSize = fileTmp.length()
         this.synchronized {
           if (file.exists()) {
             file.delete()
@@ -208,6 +209,14 @@ private[spark] class IndexShuffleBlockResolver(
             throw new IOException(s"fail to rename file ${fileTmp} to ${file}")
           }
         }
+        blockManager.reportBlockStatus(blockId, BlockStatus(
+          StorageLevel(
+            useDisk = true,
+            useMemory = false,
+            useOffHeap = false,
+            deserialized = false,
+            replication = 0)
+          , 0, diskSize))
       }
 
       override def onFailure(streamId: String, cause: Throwable): Unit = {
