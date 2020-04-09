@@ -654,9 +654,10 @@ private[spark] class BlockManager(
   override def putBlockDataAsStream(
       blockId: BlockId,
       level: StorageLevel,
-    classTag: ClassTag[_]): StreamCallbackWithID = {
+      classTag: ClassTag[_]): StreamCallbackWithID = {
     // Delegate shuffle blocks here to resolver if supported
     if (blockId.isShuffle || blockId.isInternalShuffle) {
+      println("Putting shuffle block ${blockId}")
       try {
         return indexShuffleResolver.putShuffleBlockAsStream(blockId, serializerManager)
       } catch {
@@ -665,6 +666,7 @@ private[spark] class BlockManager(
           s"resolver ${shuffleManager.shuffleBlockResolver}")
       }
     }
+    println("Putting regular block ${blockId}")
     // All other blocks
     val (_, tmpFile) = diskBlockManager.createTempLocalBlock()
     val channel = new CountingWritableChannel(
@@ -1960,11 +1962,14 @@ private[spark] class BlockManager(
               logDebug(s"Attempting to replicate all cached RDD blocks")
               offloadShuffleBlocks()
               logInfo(s"Attempt to replicate all cached blocks done")
-            } else if (conf.get(config.STORAGE_RDD_DECOMMISSION_ENABLED)) {
+            }
+            if (conf.get(config.STORAGE_RDD_DECOMMISSION_ENABLED)) {
               logDebug(s"Attempting to replicate all cached RDD blocks")
               decommissionRddCacheBlocks()
               logInfo(s"Attempt to replicate all cached blocks done")
-            } else {
+            }
+            if (!conf.get(config.STORAGE_RDD_DECOMMISSION_ENABLED) &&
+              !conf.get(config.STORAGE_SHUFFLE_DECOMMISSION_ENABLED)) {
               logWarning("Decommissioning, but no task configured set one or both:\n" +
                 "spark.storage.decommission.shuffle_blocks\n" +
                 "spark.storage.decommission.rdd_blocks")
