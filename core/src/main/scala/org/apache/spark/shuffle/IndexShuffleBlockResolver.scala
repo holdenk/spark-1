@@ -221,7 +221,8 @@ private[spark] class IndexShuffleBlockResolver(
   /**
    * Get the index & data block for migration.
    */
-  def getMigrationBlocks(shuffleId: Int, mapId: Long): ((BlockId, ManagedBuffer), (BlockId, ManagedBuffer)) = {
+  def getMigrationBlocks(shuffleId: Int, mapId: Long):
+      ((BlockId, ManagedBuffer), (BlockId, ManagedBuffer)) = {
     // Load the index block
     val indexFile = getIndexFile(shuffleId, mapId)
     val indexBlockId = ShuffleIndexBlockId(shuffleId, mapId, 0)

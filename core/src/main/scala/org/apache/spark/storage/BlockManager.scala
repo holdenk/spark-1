@@ -1814,16 +1814,24 @@ private[spark] class BlockManager(
    */
   def offloadShuffleBlocks(): Unit = {
     val localShuffles = indexShuffleResolver.getStoredShuffles()
-    val shufflesToMigrate = localShuffles.&~(migratedShuffles)
-    // If we have less shuffles than peers use the local ones first. Only transfer one shuffle at a time
-    val targetHosts = sortLocations(getPeers(false))
-    val shufflesToHosts = shufflesToMigrate.zip(targetHosts)
-    val migrated = shufflesToMigrate.par.flatMap{ case ((shuffleId, mapId), targetHost) =>
+    val shufflesToMigrate = localShuffles.&~(migratedShuffles).toSeq
+    val peers = getPeers(false)
+    // If we have less shuffles than peers use the local ones first.
+    // Only transfer one shuffle at a time per host.
+    // Future TODO: Use a worker/producer model to migrate blocks with less blocking.
+    val targetHosts: Seq[BlockManagerId] = if (peers.size < shufflesToMigrate.size) {
+      sortLocations(getPeers(false))
+    } else {
+      peers
+    }
+    val shufflesToHosts: Seq[((Int, Long), BlockManagerId)] = shufflesToMigrate.zip(targetHosts)
+    val migrated = shufflesToHosts.par.flatMap{ case ((shuffleId, mapId), targetHost) =>
       try {
-
+        Some(1)
       } catch {
         case e: Exception =>
           logError("Failed to replicate ${shuffleId},${mapId} to ${host}")
+          None
       }
     }
   }
@@ -1948,16 +1956,16 @@ private[spark] class BlockManager(
         while (blockManagerDecommissioning && !stopped) {
           try {
             // If enabled we migrate shuffle blocks first as they are more expensive.
-            if (conf.get(STORAGE_SHUFFLE_DECOMMISSION_ENABLED)) {
+            if (conf.get(config.STORAGE_SHUFFLE_DECOMMISSION_ENABLED)) {
               logDebug(s"Attempting to replicate all cached RDD blocks")
               offloadShuffleBlocks()
               logInfo(s"Attempt to replicate all cached blocks done")
-            } else if (conf.get(STORAGE_RDD_DECOMMISSION_ENABLED)) {
+            } else if (conf.get(config.STORAGE_RDD_DECOMMISSION_ENABLED)) {
               logDebug(s"Attempting to replicate all cached RDD blocks")
               decommissionRddCacheBlocks()
               logInfo(s"Attempt to replicate all cached blocks done")
             } else {
-              logWarning("Decommissioning, but no task configured set one or both:\n"+
+              logWarning("Decommissioning, but no task configured set one or both:\n" +
                 "spark.storage.decommission.shuffle_blocks\n" +
                 "spark.storage.decommission.rdd_blocks")
             }
