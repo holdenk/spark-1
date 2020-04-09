@@ -1801,7 +1801,7 @@ private[spark] class BlockManager(
   def decommissionBlockManager(): Unit = {
     if (!blockManagerDecommissioning) {
       println("Starting block manager decommissioning process")
-      logInfo("Starting block manager decommissioning process")
+      logInfo("Starting block manager decommissioning process...")
       blockManagerDecommissioning = true
       decommissionManager = Some(new BlockManagerDecommissionManager(conf))
       decommissionManager.foreach(_.start())
