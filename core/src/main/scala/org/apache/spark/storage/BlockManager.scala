@@ -1801,7 +1801,6 @@ private[spark] class BlockManager(
   def decommissionBlockManager(): Unit = {
     if (!blockManagerDecommissioning) {
       println("Starting block manager decommissioning process")
-      throw new Exception("fuck")
       logInfo("Starting block manager decommissioning process")
       blockManagerDecommissioning = true
       decommissionManager = Some(new BlockManagerDecommissionManager(conf))
@@ -1833,6 +1832,7 @@ private[spark] class BlockManager(
     }
     val shufflesToPeers: Seq[((Int, Long), BlockManagerId)] = shufflesToMigrate.zip(targetPeers)
     val migrated = shufflesToPeers.par.flatMap{ case ((shuffleId, mapId), peer) =>
+        println(s"Trying to migrate ${shuffleId},${mapId}")
 //      try {
         val ((indexBlockId, indexBuffer), (dataBlockId, dataBuffer)) =
           indexShuffleResolver.getMigrationBlocks(shuffleId, mapId)
@@ -1844,6 +1844,7 @@ private[spark] class BlockManager(
           indexBuffer,
           null,// storage level, TODO fix
           null)// class tag, we don't need for shuffle
+        println("Migrated!")
         Some((shuffleId, mapId))
 //      } catch {
 //        case e: Exception =>
@@ -1975,11 +1976,13 @@ private[spark] class BlockManager(
           try {
             // If enabled we migrate shuffle blocks first as they are more expensive.
             if (conf.get(config.STORAGE_SHUFFLE_DECOMMISSION_ENABLED)) {
+              println("Offloading shuffle blocks")
               logDebug(s"Attempting to replicate all cached RDD blocks")
               offloadShuffleBlocks()
               logInfo(s"Attempt to replicate all cached blocks done")
             }
             if (conf.get(config.STORAGE_RDD_DECOMMISSION_ENABLED)) {
+              println("Offloading cache blocks.")
               logDebug(s"Attempting to replicate all cached RDD blocks")
               decommissionRddCacheBlocks()
               logInfo(s"Attempt to replicate all cached blocks done")
