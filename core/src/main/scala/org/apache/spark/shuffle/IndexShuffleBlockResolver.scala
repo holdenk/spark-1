@@ -266,7 +266,9 @@ private[spark] class IndexShuffleBlockResolver(
       mapId: Long,
       lengths: Array[Long],
       dataTmp: File): Unit = {
+    println("Writing index files and commits")
     val indexFile = getIndexFile(shuffleId, mapId)
+    pritnln(s"Index file is ${indexFile}")
     val indexTmp = Utils.tempFileWith(indexFile)
     try {
       val dataFile = getDataFile(shuffleId, mapId)
