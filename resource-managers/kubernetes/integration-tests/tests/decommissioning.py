@@ -35,7 +35,7 @@ if __name__ == "__main__":
     def addToAcc(x):
         acc.add(1)
         return x
-    initialRdd = sc.parallelize(range(10))
+    initialRdd = sc.parallelize(range(1000), 10)
     accRdd = initialRdd.map(addToAcc)
     # Trigger a shuffle so there are shuffle blocks to migrate
     rdd = accRdd.map(lambda x: (x, x)).groupByKey()
