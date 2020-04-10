@@ -1820,8 +1820,11 @@ private[spark] class BlockManager(
   def offloadShuffleBlocks(): Unit = {
     println("Offloading shuffle blocks")
     val localShuffles = indexShuffleResolver.getStoredShuffles()
+    println(s"My local shuffles are ${localShuffles.toList}")
     val shufflesToMigrate = localShuffles.&~(migratedShuffles).toSeq
+    println(s"My shuffles to migrate ${shufflesToMigrate.toList}")
     val peers = getPeers(false)
+    println(s"My peers are ${peers}")
     // If we have less shuffles than peers use the local ones first.
     // Only transfer one shuffle at a time per host.
     // Future TODO: Use a worker/producer model to migrate blocks with less blocking.
@@ -1830,7 +1833,9 @@ private[spark] class BlockManager(
     } else {
       peers
     }
+    println(s"My target peers are ${targetPeers.toList}")
     val shufflesToPeers: Seq[((Int, Long), BlockManagerId)] = shufflesToMigrate.zip(targetPeers)
+    println(s"My shufflesToPeers are ${shufflesToPeers.toList}")
     val migrated = shufflesToPeers.par.flatMap{ case ((shuffleId, mapId), peer) =>
         println(s"Trying to migrate ${shuffleId},${mapId}")
 //      try {
