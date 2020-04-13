@@ -1823,14 +1823,15 @@ private[spark] class BlockManager(
     println(s"My local shuffles are ${localShuffles.toList}")
     val shufflesToMigrate = localShuffles.&~(migratedShuffles).toSeq
     println(s"My shuffles to migrate ${shufflesToMigrate.toList}")
-    val peers = getPeers(false)
+    val peers = sortLocations(getPeers(false))
     println(s"My peers are ${peers}")
     // If we have less shuffles than peers use the local ones first.
+    // Otherwise copy at most 2x
     // Future TODO: Use a worker/producer model to migrate blocks with less blocking.
     val targetPeers: Seq[BlockManagerId] = if (peers.size > shufflesToMigrate.size) {
-      sortLocations(peers)
+      peers
     } else {
-      0.to(shufflesToMigrate.size / peers.size).flatMap(_ => peers)
+      1.to(2).flatMap(_ => peers)
     }
     println(s"My target peers are ${targetPeers.toList}")
     val shufflesToPeers: Seq[((Int, Long), BlockManagerId)] = shufflesToMigrate.zip(targetPeers)
