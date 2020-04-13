@@ -1826,12 +1826,12 @@ private[spark] class BlockManager(
     val peers = sortLocations(getPeers(false)).toList
     println(s"My (raw) peers are ${peers}")
     // If we have less shuffles than peers use the local ones first.
-    // Otherwise copy at most 3x
+    // Otherwise copy at most 5x
     // Future TODO: Use a worker/producer model to migrate blocks with less blocking.
     val targetPeers: Seq[BlockManagerId] = if (peers.size > shufflesToMigrate.size) {
       peers
     } else {
-      1.to(3).flatMap(_ => peers)
+      1.to(5).flatMap(_ => peers)
     }
     println(s"My computer target peers are ${targetPeers.toList}")
     val shufflesToPeers: Seq[((Int, Long), BlockManagerId)] = shufflesToMigrate.zip(targetPeers)
@@ -2022,7 +2022,7 @@ private[spark] class BlockManager(
                 "spark.storage.decommission.shuffle_blocks\n" +
                 "spark.storage.decommission.rdd_blocks")
             }
-            println("Sleeping for ${sleepInterval}")
+            println(s"Sleeping for ${sleepInterval}")
             Thread.sleep(sleepInterval)
           } catch {
             case _: InterruptedException =>
@@ -2033,7 +2033,7 @@ private[spark] class BlockManager(
                 "replicate cached RDD blocks for block manager decommissioning", e)
           }
         }
-        println("Exited loop with ${blockManagerDecommissioning} & ${stopped}")
+        println(s"Exited loop with ${blockManagerDecommissioning} & ${stopped}")
       }
     }
     cacheReplicationThread.setDaemon(true)
