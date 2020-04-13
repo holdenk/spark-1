@@ -29,7 +29,7 @@ private[spark] trait DecommissionSuite { k8sSuite: KubernetesSuite =>
       .set("spark.kubernetes.pyspark.pythonVersion", "3")
       .set("spark.kubernetes.container.image", pyImage)
       .set("spark.storage.decommission.enabled", "true")
-      .set("spark.storage.decommission.shuffle_blocks", "false")
+      .set("spark.storage.decommission.shuffle_blocks", "true")
       .set("spark.storage.decommission.rdd_blocks", "true")
 
     runSparkApplicationAndVerifyCompletion(
@@ -38,7 +38,7 @@ private[spark] trait DecommissionSuite { k8sSuite: KubernetesSuite =>
       expectedLogOnCompletion = Seq(
         "Finished waiting, stopping Spark",
         "decommissioning executor",
-        "Final accumulator value is: 1000?"),
+        "Final accumulator value is: 1000"),
       appArgs = Array.empty[String],
       driverPodChecker = doBasicDriverPyPodCheck,
       executorPodChecker = doBasicExecutorPyPodCheck,
