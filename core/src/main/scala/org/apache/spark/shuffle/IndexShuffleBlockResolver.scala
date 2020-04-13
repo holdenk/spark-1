@@ -70,8 +70,8 @@ private[spark] class IndexShuffleBlockResolver(
     val searchDirs = rootDirs.flatMap(_.listFiles()).filter(_.isDirectory()) ++ rootDirs
     println(s"Searching targets ${searchDirs.toList}")
     val filenames = searchDirs.flatMap(_.list())
-    println(s"Got files ${fileNames.toList}")
-    fileNames.flatMap{ fname =>
+    println(s"Got files ${filenames.toList}")
+    filenames.flatMap{ fname =>
       pattern.findAllIn(fname).matchData.map {
         matched => (matched.group(1).toInt, matched.group(2).toLong)
       }

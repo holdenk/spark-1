@@ -1847,7 +1847,12 @@ private[spark] class BlockManager(
           peer.executorId,
           indexBlockId,
           indexBuffer,
-          null,// storage level, TODO fix
+          StorageLevel(
+            useDisk=true,
+            useMemory=false,
+            useOffHeap=false,
+            deserialized=false,
+            replication=1),
           null)// class tag, we don't need for shuffle
         println("Migrated!")
         Some((shuffleId, mapId))
