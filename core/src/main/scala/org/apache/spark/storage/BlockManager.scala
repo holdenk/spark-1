@@ -1823,17 +1823,17 @@ private[spark] class BlockManager(
     println(s"My local shuffles are ${localShuffles.toList}")
     val shufflesToMigrate = localShuffles.&~(migratedShuffles).toSeq
     println(s"My shuffles to migrate ${shufflesToMigrate.toList}")
-    val peers = sortLocations(getPeers(false))
-    println(s"My peers are ${peers}")
+    val peers = sortLocations(getPeers(false)).toList
+    println(s"My (raw) peers are ${peers}")
     // If we have less shuffles than peers use the local ones first.
-    // Otherwise copy at most 2x
+    // Otherwise copy at most 3x
     // Future TODO: Use a worker/producer model to migrate blocks with less blocking.
     val targetPeers: Seq[BlockManagerId] = if (peers.size > shufflesToMigrate.size) {
       peers
     } else {
-      1.to(2).flatMap(_ => peers)
+      1.to(3).flatMap(_ => peers)
     }
-    println(s"My target peers are ${targetPeers.toList}")
+    println(s"My computer target peers are ${targetPeers.toList}")
     val shufflesToPeers: Seq[((Int, Long), BlockManagerId)] = shufflesToMigrate.zip(targetPeers)
     println(s"My shufflesToPeers are ${shufflesToPeers.toList}")
     val migrated = shufflesToPeers.par.flatMap{ case ((shuffleId, mapId), peer) =>
@@ -2005,7 +2005,7 @@ private[spark] class BlockManager(
           try {
             // If enabled we migrate shuffle blocks first as they are more expensive.
             if (conf.get(config.STORAGE_SHUFFLE_DECOMMISSION_ENABLED)) {
-              println("Offloading shuffle blocks")
+              println("Starting with offloading shuffle blocks")
               logDebug(s"Attempting to replicate all cached RDD blocks")
               offloadShuffleBlocks()
               logInfo(s"Attempt to replicate all cached blocks done")
