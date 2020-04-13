@@ -1818,7 +1818,7 @@ private[spark] class BlockManager(
    * Requires an Indexed based shuffle resolver.
    */
   def offloadShuffleBlocks(): Unit = {
-    println("Offloading shuffle blocks")
+    println("Offloading shuffle blocks, eh")
     val localShuffles = indexShuffleResolver.getStoredShuffles()
     println(s"My local shuffles are ${localShuffles.toList}")
     val shufflesToMigrate = localShuffles.&~(migratedShuffles).toSeq
@@ -1826,12 +1826,11 @@ private[spark] class BlockManager(
     val peers = getPeers(false)
     println(s"My peers are ${peers}")
     // If we have less shuffles than peers use the local ones first.
-    // Only transfer one shuffle at a time per host.
     // Future TODO: Use a worker/producer model to migrate blocks with less blocking.
-    val targetPeers: Seq[BlockManagerId] = if (peers.size < shufflesToMigrate.size) {
-      sortLocations(getPeers(false))
+    val targetPeers: Seq[BlockManagerId] = if (peers.size > shufflesToMigrate.size) {
+      sortLocations(peers)
     } else {
-      peers
+      0.to(shufflesToMigrate.size / peers.size).flatMap(_ => peers)
     }
     println(s"My target peers are ${targetPeers.toList}")
     val shufflesToPeers: Seq[((Int, Long), BlockManagerId)] = shufflesToMigrate.zip(targetPeers)
@@ -1854,6 +1853,19 @@ private[spark] class BlockManager(
             deserialized=false,
             replication=1),
           null)// class tag, we don't need for shuffle
+        blockTransferService.uploadBlockSync(
+          peer.host,
+          peer.port,
+          peer.executorId,
+          dataBlockId,
+          dataBuffer,
+          StorageLevel(
+            useDisk=true,
+            useMemory=false,
+            useOffHeap=false,
+            deserialized=false,
+            replication=1),
+          null)// class tag, we don't need for shuffle
         println("Migrated!")
         Some((shuffleId, mapId))
 //      } catch {
@@ -1863,6 +1875,7 @@ private[spark] class BlockManager(
 //          None
 //      }
     }
+    migratedShuffles ++= migrated.seq
   }
 
   /**
@@ -1981,8 +1994,13 @@ private[spark] class BlockManager(
   private class BlockManagerDecommissionManager(conf: SparkConf) {
     @volatile private var stopped = false
     private val cacheReplicationThread = new Thread {
+    val sleepInterval = conf.get(
+      config.STORAGE_DECOMMISSION_REPLICATION_REATTEMPT_INTERVAL)
+
       override def run(): Unit = {
+        println("Running decommission....")
         while (blockManagerDecommissioning && !stopped) {
+          println("Looping through decom.")
           try {
             // If enabled we migrate shuffle blocks first as they are more expensive.
             if (conf.get(config.STORAGE_SHUFFLE_DECOMMISSION_ENABLED)) {
@@ -2003,23 +2021,26 @@ private[spark] class BlockManager(
                 "spark.storage.decommission.shuffle_blocks\n" +
                 "spark.storage.decommission.rdd_blocks")
             }
-            val sleepInterval = conf.get(
-              config.STORAGE_DECOMMISSION_REPLICATION_REATTEMPT_INTERVAL)
+            println("Sleeping for ${sleepInterval}")
             Thread.sleep(sleepInterval)
           } catch {
             case _: InterruptedException =>
+              println("Interruped!")
               // no-op
             case NonFatal(e) =>
               logError("Error occurred while trying to " +
                 "replicate cached RDD blocks for block manager decommissioning", e)
           }
         }
+        println("Exited loop with ${blockManagerDecommissioning} & ${stopped}")
       }
     }
     cacheReplicationThread.setDaemon(true)
     cacheReplicationThread.setName("cache-replication-thread")
 
     def start(): Unit = {
+      println("OI@")
+      logInfo("Starting block replication thread")
       cacheReplicationThread.start()
     }
 

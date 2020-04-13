@@ -244,11 +244,9 @@ private[spark] class IndexShuffleBlockResolver(
     val indexFileSize = indexFile.length()
     val indexBlockData = new FileSegmentManagedBuffer(transportConf, indexFile, 0, indexFileSize)
 
-    // Find the end reduce ID
-    val endReduceId = (indexFileSize / 8) - 1
     // Load the data block
     val dataFile = getDataFile(shuffleId, mapId)
-    val dataBlockId = ShuffleBlockBatchId(shuffleId, mapId, 0, endReduceId.toInt)
+    val dataBlockId = ShuffleDataBlockId(shuffleId, mapId, 0)
     val dataBlockData = new FileSegmentManagedBuffer(transportConf, dataFile, 0, dataFile.length())
     ((indexBlockId, indexBlockData), (dataBlockId, dataBlockData))
   }

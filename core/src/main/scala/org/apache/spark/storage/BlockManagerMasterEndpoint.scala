@@ -492,7 +492,7 @@ class BlockManagerMasterEndpoint(
       storageLevel: StorageLevel,
       memSize: Long,
       diskSize: Long): Boolean = {
-    println(s"Updating block info on master ${blockId} of type ${blockId.isShuffle}")
+    println(s"Updating block info on master ${blockId} of type ${blockId.isInternalShuffle}")
     println(s"Storage level is ${storageLevel}")
 
     if (!blockManagerInfo.contains(blockManagerId)) {
@@ -510,9 +510,12 @@ class BlockManagerMasterEndpoint(
       return true
     }
 
-    if (blockId.isShuffle && storageLevel.isValid) {
+    if (blockId.isInternalShuffle && storageLevel.isValid) {
       blockId match {
-        case ShuffleBlockId(shuffleId: Int, mapId: Long, reduceId: Int) =>
+        case ShuffleIndexBlockId(shuffleId, mapId, _) =>
+          // Don't update the map output on just the index block
+          logDebug("Received shuffle index block update for ${shuffleId} ${mapId}")
+        case ShuffleDataBlockId(shuffleId: Int, mapId: Long, reduceId: Int) =>
           mapOutputTracker.updateMapOutput(shuffleId, mapId, blockManagerId)
         case _ =>
           logError(s"Unexpected shuffle block type ${blockId}")
