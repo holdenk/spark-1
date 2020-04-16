@@ -1838,7 +1838,7 @@ private[spark] class BlockManager(
     println(s"My shufflesToPeers are ${shufflesToPeers.toList}")
     val migrated = shufflesToPeers.par.flatMap{ case ((shuffleId, mapId), peer) =>
         println(s"Trying to migrate ${shuffleId},${mapId}")
-//      try {
+      try {
         val ((indexBlockId, indexBuffer), (dataBlockId, dataBuffer)) =
           indexShuffleResolver.getMigrationBlocks(shuffleId, mapId)
         blockTransferService.uploadBlockSync(
@@ -1869,12 +1869,11 @@ private[spark] class BlockManager(
           null)// class tag, we don't need for shuffle
         println("Migrated!")
         Some((shuffleId, mapId))
-//      } catch {
-//        case e: Exception =>
-// TODO: Delete block
-//          logError("Failed to replicate ${shuffleId},${mapId} to ${host}")
-//          None
-//      }
+      } catch {
+        case e: Exception =>
+          logError("Failed to replicate ${shuffleId},${mapId} to ${host}")
+          None
+      }
     }
     migratedShuffles ++= migrated.seq
   }
