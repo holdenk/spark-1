@@ -314,6 +314,7 @@ class KubernetesSuite extends SparkFunSuite
             case Action.MODIFIED =>
               execPods(name) = resource
             case Action.ADDED =>
+              println(s"Add event received for $name.")
               logDebug(s"Add event received for $name.")
               execPods(name) = resource
               // If testing decommissioning start a thread to simulate
@@ -339,7 +340,9 @@ class KubernetesSuite extends SparkFunSuite
                 // Delete the pod to simulate cluster scale down/migration.
                 // This will allow the pod to remain up for the grace period
                 val pod = kubernetesTestComponents.kubernetesClient.pods().withName(name)
+                println(s"Found pod for decom/delete: $name ${pod}")
                 pod.delete()
+                println("Deleting pod with regular grace period ${name} ${pod}")
                 logDebug(s"Triggered pod decom/delete: $name deleted")
                 // Look for the string that indicates we should force kill the first
                 // Executor. This simulates the pod being fully lost.
