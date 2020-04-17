@@ -26,6 +26,7 @@ import java.util.concurrent.{CompletableFuture, ConcurrentHashMap, TimeUnit}
 
 import scala.collection.mutable
 import scala.collection.mutable.HashMap
+import scala.collection.JavaConverters._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration._
 import scala.reflect.ClassTag
@@ -1810,7 +1811,74 @@ private[spark] class BlockManager(
     }
   }
 
-  private val migratedShuffles = mutable.HashSet[(Int, Long)]()
+
+  // Shuffles which are either in queue for migrations or migrated
+  private val migratingShuffles = mutable.HashSet[(Int, Long)]()
+  // Shuffles which are queued for migration
+  private val shufflesToMigrate = new java.util.concurrent.ConcurrentLinkedQueue[(Int, Long)]()
+
+
+  private class ShuffleMigrationRunnable(peer: BlockManagerId) extends Runnable {
+    @volatile var running = true
+    override def run(): Unit = {
+      var migrating: Option[(Int, Long)] = None
+      // Once a block fails to transfer to an executor stop trying to transfer more blocks
+      try {
+        while (running) {
+          val migrating = Option(shufflesToMigrate.poll())
+          migrating match {
+            case None =>
+              // Nothing to do right now, but maybe a transfer will fail or a new block
+              // will finish being committed.
+              val SLEEP_TIME_SECS = 5
+              Thread.sleep(SLEEP_TIME_SECS * 1000L)
+            case Some((shuffleId, mapId)) =>
+              println(s"Trying to migrate ${shuffleId},${mapId} to ${peer}")
+              val ((indexBlockId, indexBuffer), (dataBlockId, dataBuffer)) =
+                indexShuffleResolver.getMigrationBlocks(shuffleId, mapId)
+              blockTransferService.uploadBlockSync(
+                peer.host,
+                peer.port,
+                peer.executorId,
+                indexBlockId,
+                indexBuffer,
+                StorageLevel(
+                  useDisk=true,
+                  useMemory=false,
+                  useOffHeap=false,
+                  deserialized=false,
+                  replication=1),
+                null)// class tag, we don't need for shuffle
+              blockTransferService.uploadBlockSync(
+                peer.host,
+                peer.port,
+                peer.executorId,
+                dataBlockId,
+                dataBuffer,
+                StorageLevel(
+                  useDisk=true,
+                  useMemory=false,
+                  useOffHeap=false,
+                  deserialized=false,
+                  replication=1),
+                null)// class tag, we don't need for shuffle
+          }
+        }
+      } catch {
+        case e: Exception =>
+          migrating match {
+            case Some(shuffleMap) =>
+              logError("Error ${e} during migration, adding ${shuffleMap} back to migration queue")
+              shufflesToMigrate.add(shuffleMap)
+            case None =>
+              logError("Error ${e} while waiting for block to migrate")
+          }
+      }
+    }
+  }
+
+  private val migrationPeers = mutable.HashMap[BlockManagerId, ShuffleMigrationRunnable]()
+
   /**
    * Tries to offload all shuffle blocks that are registered with the shuffle service locally.
    * Note: this does not delete the shuffle files in-case there is an in-progress fetch
@@ -1818,64 +1886,30 @@ private[spark] class BlockManager(
    * Requires an Indexed based shuffle resolver.
    */
   def offloadShuffleBlocks(): Unit = {
+    // Update the queue of shuffles to be migrated
     println("Offloading shuffle blocks, eh")
     val localShuffles = indexShuffleResolver.getStoredShuffles()
     println(s"My local shuffles are ${localShuffles.toList}")
-    val shufflesToMigrate = localShuffles.&~(migratedShuffles).toSeq
-    println(s"My shuffles to migrate ${shufflesToMigrate.toList}")
-    val peers = sortLocations(getPeers(false)).toList
-    println(s"My (raw) peers are ${peers}")
-    // If we have less shuffles than peers use the local ones first.
-    // Otherwise copy at most 5x
-    // Future TODO: Use a worker/producer model to migrate blocks with less blocking.
-    val targetPeers: Seq[BlockManagerId] = if (peers.size > shufflesToMigrate.size) {
-      peers
-    } else {
-      1.to(5).flatMap(_ => peers)
+    val newShufflesToMigrate = localShuffles.&~(migratingShuffles).toSeq
+    println(s"My new shuffles to migrate ${newShufflesToMigrate.toList}")
+    shufflesToMigrate.addAll(newShufflesToMigrate.asJava)
+    // Update the threads doing migrations
+    // TODO: Sort & only start as many threads as min(||blocks||, ||targets||) using location pref
+    val livePeerSet = getPeers(false).toSet
+    val currentPeerSet = migrationPeers.keys.toSet
+    val deadPeers = currentPeerSet.&~(livePeerSet)
+    val newPeers = livePeerSet.&~(currentPeerSet)
+    migrationPeers ++= newPeers.map{peer =>
+      val executor = ThreadUtils.newDaemonSingleThreadExecutor(s"migrate-shuffle-to-${peer}")
+      val runnable = new ShuffleMigrationRunnable(peer)
+      executor.submit(runnable)
+      (peer, runnable)
     }
-    println(s"My computer target peers are ${targetPeers.toList}")
-    val shufflesToPeers: Seq[((Int, Long), BlockManagerId)] = shufflesToMigrate.zip(targetPeers)
-    println(s"My shufflesToPeers are ${shufflesToPeers.toList}")
-    val migrated = shufflesToPeers.par.flatMap{ case ((shuffleId, mapId), peer) =>
-        println(s"Trying to migrate ${shuffleId},${mapId}")
-      try {
-        val ((indexBlockId, indexBuffer), (dataBlockId, dataBuffer)) =
-          indexShuffleResolver.getMigrationBlocks(shuffleId, mapId)
-        blockTransferService.uploadBlockSync(
-          peer.host,
-          peer.port,
-          peer.executorId,
-          indexBlockId,
-          indexBuffer,
-          StorageLevel(
-            useDisk=true,
-            useMemory=false,
-            useOffHeap=false,
-            deserialized=false,
-            replication=1),
-          null)// class tag, we don't need for shuffle
-        blockTransferService.uploadBlockSync(
-          peer.host,
-          peer.port,
-          peer.executorId,
-          dataBlockId,
-          dataBuffer,
-          StorageLevel(
-            useDisk=true,
-            useMemory=false,
-            useOffHeap=false,
-            deserialized=false,
-            replication=1),
-          null)// class tag, we don't need for shuffle
-        println("Migrated!")
-        Some((shuffleId, mapId))
-      } catch {
-        case e: Exception =>
-          logError("Failed to replicate ${shuffleId},${mapId} to ${host}")
-          None
-      }
+    // A peer may have entered a decommissioning state, don't transfer any new blocks
+    deadPeers.map{peer =>
+        migrationPeers.get(peer).map(_.running = false)
     }
-    migratedShuffles ++= migrated.seq
+    migratingShuffles ++= newShufflesToMigrate
   }
 
   /**
