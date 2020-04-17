@@ -339,10 +339,13 @@ class KubernetesSuite extends SparkFunSuite
                 }
                 // Delete the pod to simulate cluster scale down/migration.
                 // This will allow the pod to remain up for the grace period
-                val pod = kubernetesTestComponents.kubernetesClient.pods().withName(name)
-                println(s"Found pod for decom/delete: $name ${pod}")
-                pod.delete()
-                println("Deleting pod with regular grace period ${name} ${pod}")
+                val execPod = (kubernetesTestComponents.kubernetesClient.pods()
+                  .withName(name)
+                  .withLabel("spark-app-locator", appLocator)
+                  .withLabel("spark-role", "executor"))
+                println(s"Found pod for decom/delete: $name ${pod.getItems().toList} ${pod.getItems().size}")
+                execPod.delete()
+                println(s"Deleting pod with regular grace period ${name} ${pod}")
                 logDebug(s"Triggered pod decom/delete: $name deleted")
                 // Look for the string that indicates we should force kill the first
                 // Executor. This simulates the pod being fully lost.
@@ -354,8 +357,14 @@ class KubernetesSuite extends SparkFunSuite
                     .getLog
                     .contains("Waiting some more, please kill exec 1...."),
                     "Decommission test did not complete second collect.")
-                  pod.withGracePeriod(0).delete()
                 }
+                println("Force deleting")
+                val podNoGrace = (kubernetesTestComponents.kubernetesClient.pods()
+                  .withName(name)
+                  .withLabel("spark-app-locator", appLocator)
+                  .withLabel("spark-role", "executor")
+                  .withGracePeriod(0))
+                podNoGrace.delete()
               }
             case Action.DELETED | Action.ERROR =>
               execPods.remove(name)
