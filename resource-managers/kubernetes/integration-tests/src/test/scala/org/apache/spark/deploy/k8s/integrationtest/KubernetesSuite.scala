@@ -334,17 +334,14 @@ class KubernetesSuite extends SparkFunSuite
                     .pods()
                     .withName(driverPodName)
                     .getLog
-                    .contains("Waiting to give nodes time to finish."),
+                    .contains("Waiting to give nodes time to finish migration, decom exec 1."),
                     "Decommission test did not complete first collect.")
                 }
                 // Delete the pod to simulate cluster scale down/migration.
                 // This will allow the pod to remain up for the grace period
-                val execPod = (kubernetesTestComponents.kubernetesClient.pods()
+                val pod = kubernetesTestComponents.kubernetesClient.pods()
                   .withName(name)
-                  .withLabel("spark-app-locator", appLocator)
-                  .withLabel("spark-role", "executor"))
-                println(s"Found pod for decom/delete: $name ${pod.getItems().toList} ${pod.getItems().size}")
-                execPod.delete()
+                pod.delete()
                 println(s"Deleting pod with regular grace period ${name} ${pod}")
                 logDebug(s"Triggered pod decom/delete: $name deleted")
                 // Look for the string that indicates we should force kill the first
@@ -355,15 +352,11 @@ class KubernetesSuite extends SparkFunSuite
                     .pods()
                     .withName(driverPodName)
                     .getLog
-                    .contains("Waiting some more, please kill exec 1...."),
+                    .contains("Waiting some more, please kill exec 1."),
                     "Decommission test did not complete second collect.")
                 }
                 println("Force deleting")
-                val podNoGrace = (kubernetesTestComponents.kubernetesClient.pods()
-                  .withName(name)
-                  .withLabel("spark-app-locator", appLocator)
-                  .withLabel("spark-role", "executor")
-                  .withGracePeriod(0))
+                val podNoGrace = pod.withGracePeriod(0)
                 podNoGrace.delete()
               }
             case Action.DELETED | Action.ERROR =>
