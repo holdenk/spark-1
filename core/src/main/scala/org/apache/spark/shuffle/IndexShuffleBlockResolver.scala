@@ -65,12 +65,10 @@ private[spark] class IndexShuffleBlockResolver(
     // Matches ShuffleIndexBlockId name
     val pattern = "shuffle_(\\d+)_(\\d+)_.+\\.index".r
     val rootDirs = blockManager.diskBlockManager.localDirs
-    println(s"Searching root ${rootDirs.toList}")
     // ExecutorDiskUtil puts things inside one level hashed sub directories
     val searchDirs = rootDirs.flatMap(_.listFiles()).filter(_.isDirectory()) ++ rootDirs
-    println(s"Searching targets ${searchDirs.toList}")
     val filenames = searchDirs.flatMap(_.list())
-    println(s"Got files ${filenames.toList}")
+    logDebug(s"Got block files ${filenames.toList}")
     filenames.flatMap{ fname =>
       pattern.findAllIn(fname).matchData.map {
         matched => (matched.group(1).toInt, matched.group(2).toLong)
@@ -267,9 +265,7 @@ private[spark] class IndexShuffleBlockResolver(
       mapId: Long,
       lengths: Array[Long],
       dataTmp: File): Unit = {
-    println("Writing index files and commits")
     val indexFile = getIndexFile(shuffleId, mapId)
-    println(s"Index file is ${indexFile}")
     val indexTmp = Utils.tempFileWith(indexFile)
     try {
       val dataFile = getDataFile(shuffleId, mapId)

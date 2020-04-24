@@ -649,7 +649,6 @@ private[spark] class BlockManager(
       data: ManagedBuffer,
       level: StorageLevel,
       classTag: ClassTag[_]): Boolean = {
-    println(s"Putting block data ${blockId} w/ buffer")
     putBytes(blockId, new ChunkedByteBuffer(data.nioByteBuffer()), level)(classTag)
   }
 
@@ -657,10 +656,9 @@ private[spark] class BlockManager(
       blockId: BlockId,
       level: StorageLevel,
       classTag: ClassTag[_]): StreamCallbackWithID = {
-    println(s"Putting block data ${blockId} w/ stream")
     // Delegate shuffle blocks here to resolver if supported
     if (blockId.isShuffle || blockId.isInternalShuffle) {
-      println("Putting shuffle block ${blockId}")
+      logDebug(s"Putting shuffle block ${blockId}")
       try {
         return indexShuffleResolver.putShuffleBlockAsStream(blockId, serializerManager)
       } catch {
@@ -669,7 +667,7 @@ private[spark] class BlockManager(
           s"resolver ${shuffleManager.shuffleBlockResolver}")
       }
     }
-    println("Putting regular block ${blockId}")
+    logDebug(s"Putting regular block ${blockId}")
     // All other blocks
     val (_, tmpFile) = diskBlockManager.createTempLocalBlock()
     val channel = new CountingWritableChannel(
@@ -1801,7 +1799,6 @@ private[spark] class BlockManager(
 
   def decommissionBlockManager(): Unit = {
     if (!blockManagerDecommissioning) {
-      println("Starting block manager decommissioning process")
       logInfo("Starting block manager decommissioning process...")
       blockManagerDecommissioning = true
       decommissionManager = Some(new BlockManagerDecommissionManager(conf))
@@ -1833,7 +1830,7 @@ private[spark] class BlockManager(
               val SLEEP_TIME_SECS = 5
               Thread.sleep(SLEEP_TIME_SECS * 1000L)
             case Some((shuffleId, mapId)) =>
-              println(s"Trying to migrate ${shuffleId},${mapId} to ${peer}")
+              logInfo(s"Trying to migrate ${shuffleId},${mapId} to ${peer}")
               val ((indexBlockId, indexBuffer), (dataBlockId, dataBuffer)) =
                 indexShuffleResolver.getMigrationBlocks(shuffleId, mapId)
               blockTransferService.uploadBlockSync(
@@ -1887,11 +1884,11 @@ private[spark] class BlockManager(
    */
   def offloadShuffleBlocks(): Unit = {
     // Update the queue of shuffles to be migrated
-    println("Offloading shuffle blocks, eh")
+    logDebug("Offloading shuffle blocks")
     val localShuffles = indexShuffleResolver.getStoredShuffles()
-    println(s"My local shuffles are ${localShuffles.toList}")
+    logDebug(s"My local shuffles are ${localShuffles.toList}")
     val newShufflesToMigrate = localShuffles.&~(migratingShuffles).toSeq
-    println(s"My new shuffles to migrate ${newShufflesToMigrate.toList}")
+    logDebug(s"My new shuffles to migrate ${newShufflesToMigrate.toList}")
     shufflesToMigrate.addAll(newShufflesToMigrate.asJava)
     // Update the threads doing migrations
     // TODO: Sort & only start as many threads as min(||blocks||, ||targets||) using location pref
@@ -1900,6 +1897,7 @@ private[spark] class BlockManager(
     val deadPeers = currentPeerSet.&~(livePeerSet)
     val newPeers = livePeerSet.&~(currentPeerSet)
     migrationPeers ++= newPeers.map{peer =>
+      logDebug(s"Starting thread to migrate shuffle blocks to ${peer}")
       val executor = ThreadUtils.newDaemonSingleThreadExecutor(s"migrate-shuffle-to-${peer}")
       val runnable = new ShuffleMigrationRunnable(peer)
       executor.submit(runnable)
