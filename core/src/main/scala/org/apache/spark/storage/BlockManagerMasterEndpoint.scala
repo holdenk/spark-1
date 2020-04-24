@@ -41,7 +41,6 @@ import org.apache.spark.util.{RpcUtils, ThreadUtils, Utils}
  * BlockManagerMasterEndpoint is an [[IsolatedRpcEndpoint]] on the master node to track statuses
  * of all slaves' block managers.
  */
-// scalastyle:off println
 private[spark]
 class BlockManagerMasterEndpoint(
     override val rpcEnv: RpcEnv,
@@ -492,8 +491,7 @@ class BlockManagerMasterEndpoint(
       storageLevel: StorageLevel,
       memSize: Long,
       diskSize: Long): Boolean = {
-    println(s"Updating block info on master ${blockId} of type ${blockId.isInternalShuffle}")
-    println(s"Storage level is ${storageLevel}")
+    logDebug(s"Updating block info on master ${blockId}")
 
     if (!blockManagerInfo.contains(blockManagerId)) {
       if (blockManagerId.isDriver && !isLocal) {

@@ -114,7 +114,6 @@ private[spark] object SignalUtils extends Logging {
     override def handle(sig: Signal): Unit = {
       // register old handler, will receive incoming signals while this handler is running
       Signal.handle(signal, prevHandler)
-      println("Handling signal ${sig}")
 
       // Run all actions, escalate to parent handler if no action catches the signal
       // (i.e. all actions return false). Note that calling `map` is to ensure that

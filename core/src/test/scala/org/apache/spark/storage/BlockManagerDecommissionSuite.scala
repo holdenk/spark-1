@@ -91,7 +91,6 @@ class BlockManagerDecommissionSuite extends SparkFunSuite with LocalSparkContext
     // Wait for the job to have started
     sem.acquire(1)
 
-    println("Decommissioning an executor...")
     // Decommission one of the executor
     val sched = sc.schedulerBackend.asInstanceOf[StandaloneSchedulerBackend]
     val execs = sched.getExecutorIds()
@@ -125,10 +124,8 @@ class BlockManagerDecommissionSuite extends SparkFunSuite with LocalSparkContext
     assert(accum.value === 10)
 
     val storageStatus = sc.env.blockManager.master.getStorageStatus
-    println(s"storageStatus ${storageStatus.toList}")
     val execIdToBlocksMapping = storageStatus.map(
       status => (status.blockManagerId.executorId, status.blocks)).toMap
-    println(s"mapping ${execIdToBlocksMapping}")
     // No cached blocks should be present on executor which was decommissioned
     assert(execIdToBlocksMapping(execToDecommission).keys.filter(_.isRDD).toSeq === Seq())
     if (persist) {
