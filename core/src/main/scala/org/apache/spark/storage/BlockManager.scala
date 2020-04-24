@@ -2031,19 +2031,16 @@ private[spark] class BlockManager(
       config.STORAGE_DECOMMISSION_REPLICATION_REATTEMPT_INTERVAL)
 
       override def run(): Unit = {
-        println("Running decommission....")
         while (blockManagerDecommissioning && !stopped) {
-          println("Looping through decom.")
+          logInfo("Iterating on migrating from the block manager.")
           try {
             // If enabled we migrate shuffle blocks first as they are more expensive.
             if (conf.get(config.STORAGE_SHUFFLE_DECOMMISSION_ENABLED)) {
-              println("Starting with offloading shuffle blocks")
               logDebug(s"Attempting to replicate all cached RDD blocks")
               offloadShuffleBlocks()
               logInfo(s"Attempt to replicate all cached blocks done")
             }
             if (conf.get(config.STORAGE_RDD_DECOMMISSION_ENABLED)) {
-              println("Offloading cache blocks.")
               logDebug(s"Attempting to replicate all cached RDD blocks")
               decommissionRddCacheBlocks()
               logInfo(s"Attempt to replicate all cached blocks done")
@@ -2054,25 +2051,23 @@ private[spark] class BlockManager(
                 "spark.storage.decommission.shuffle_blocks\n" +
                 "spark.storage.decommission.rdd_blocks")
             }
-            println(s"Sleeping for ${sleepInterval}")
+            logInfo(s"Waiting for ${sleepInterval} before refreshing migrations.")
             Thread.sleep(sleepInterval)
           } catch {
             case _: InterruptedException =>
-              println("Interruped!")
+              logInfo("Interrupted during migration, will not refresh migrations.")
               // no-op
             case NonFatal(e) =>
               logError("Error occurred while trying to " +
                 "replicate cached RDD blocks for block manager decommissioning", e)
           }
         }
-        println(s"Exited loop with ${blockManagerDecommissioning} & ${stopped}")
       }
     }
     blockMigrationThread.setDaemon(true)
     blockMigrationThread.setName("block-replication-thread")
 
     def start(): Unit = {
-      println("OI@")
       logInfo("Starting block replication thread")
       blockMigrationThread.start()
     }
