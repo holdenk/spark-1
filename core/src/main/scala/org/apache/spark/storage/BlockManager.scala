@@ -1890,6 +1890,8 @@ private[spark] class BlockManager(
     val newShufflesToMigrate = localShuffles.&~(migratingShuffles).toSeq
     logDebug(s"My new shuffles to migrate ${newShufflesToMigrate.toList}")
     shufflesToMigrate.addAll(newShufflesToMigrate.asJava)
+    migratingShuffles ++= newShufflesToMigrate
+
     // Update the threads doing migrations
     // TODO: Sort & only start as many threads as min(||blocks||, ||targets||) using location pref
     val livePeerSet = getPeers(false).toSet
@@ -1907,7 +1909,6 @@ private[spark] class BlockManager(
     deadPeers.map{peer =>
         migrationPeers.get(peer).map(_.running = false)
     }
-    migratingShuffles ++= newShufflesToMigrate
   }
 
   /**
