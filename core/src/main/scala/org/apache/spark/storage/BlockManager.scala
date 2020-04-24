@@ -2027,7 +2027,7 @@ private[spark] class BlockManager(
    */
   private class BlockManagerDecommissionManager(conf: SparkConf) {
     @volatile private var stopped = false
-    private val cacheReplicationThread = new Thread {
+    private val blockMigrationThread = new Thread {
     val sleepInterval = conf.get(
       config.STORAGE_DECOMMISSION_REPLICATION_REATTEMPT_INTERVAL)
 
@@ -2069,21 +2069,21 @@ private[spark] class BlockManager(
         println(s"Exited loop with ${blockManagerDecommissioning} & ${stopped}")
       }
     }
-    cacheReplicationThread.setDaemon(true)
-    cacheReplicationThread.setName("cache-replication-thread")
+    blockMigrationThread.setDaemon(true)
+    blockMigrationThread.setName("block-replication-thread")
 
     def start(): Unit = {
       println("OI@")
       logInfo("Starting block replication thread")
-      cacheReplicationThread.start()
+      blockMigrationThread.start()
     }
 
     def stop(): Unit = {
       if (!stopped) {
         stopped = true
         logInfo("Stopping block replication thread")
-        cacheReplicationThread.interrupt()
-        cacheReplicationThread.join()
+        blockMigrationThread.interrupt()
+        blockMigrationThread.join()
       }
     }
   }
