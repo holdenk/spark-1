@@ -448,6 +448,19 @@ class CoarseGrainedSchedulerBackend(scheduler: TaskSchedulerImpl, val rpcEnv: Rp
             logError(s"Unexpected error during decommissioning ${e.toString}", e)
         }
         logInfo(s"Finished decommissioning executor $executorId.")
+
+        if (conf.get(STORAGE_DECOMMISSION_ENABLED)) {
+          try {
+            logInfo("Starting decommissioning block manager corresponding to " +
+              s"executor $executorId.")
+            scheduler.sc.env.blockManager.master.decommissionBlockManagers(Seq(executorId))
+          } catch {
+            case e: Exception =>
+              logError("Unexpected error during block manager " +
+                s"decommissioning for executor $executorId: ${e.toString}", e)
+          }
+          logInfo(s"Acknowledged decommissioning block manager corresponding to $executorId.")
+        }
       } else {
         logInfo(s"Skipping decommissioning of executor $executorId.")
       }
@@ -585,7 +598,7 @@ class CoarseGrainedSchedulerBackend(scheduler: TaskSchedulerImpl, val rpcEnv: Rp
    */
   private[spark] def decommissionExecutor(executorId: String): Unit = {
     if (driverEndpoint != null) {
-      logInfo("Propegating executor decommission to driver.")
+      logInfo("Propagating executor decommission to driver.")
       driverEndpoint.send(DecommissionExecutor(executorId))
     }
   }
