@@ -28,6 +28,7 @@ import com.codahale.metrics.{Gauge, MetricRegistry}
 import org.apache.spark.internal.{config, Logging}
 import org.apache.spark.internal.config._
 import org.apache.spark.internal.config.Tests.TEST_SCHEDULE_INTERVAL
+import org.apache.spark.internal.config.Worker.WORKER_DECOMMISSION_ENABLED
 import org.apache.spark.metrics.source.Source
 import org.apache.spark.scheduler._
 import org.apache.spark.scheduler.dynalloc.ExecutorMonitor
@@ -196,7 +197,11 @@ private[spark] class ExecutorAllocationManager(
         s"s${DYN_ALLOCATION_SUSTAINED_SCHEDULER_BACKLOG_TIMEOUT.key} must be > 0!")
     }
     if (!conf.get(config.SHUFFLE_SERVICE_ENABLED)) {
-      if (conf.get(config.DYN_ALLOCATION_SHUFFLE_TRACKING_ENABLED)) {
+      // If dynamic allocation shuffle tracking or worker decommissioning along with
+      // storage shuffle decommissioning is enabled we have *experimental* support for
+      // decommissioning without a shuffle service.
+      if (conf.get(config.DYN_ALLOCATION_SHUFFLE_TRACKING_ENABLED) ||
+        (conf.get(WORKER_DECOMMISSION_ENABLED) && conf.get(STORAGE_SHUFFLE_DECOMMISSION_ENABLED))) {
         logWarning("Dynamic allocation without a shuffle service is an experimental feature.")
       } else if (!testing) {
         throw new SparkException("Dynamic allocation of executors requires the external " +
@@ -451,8 +456,12 @@ private[spark] class ExecutorAllocationManager(
     } else {
       // We don't want to change our target number of executors, because we already did that
       // when the task backlog decreased.
-      client.killExecutors(executorIdsToBeRemoved, adjustTargetNumExecutors = false,
-        countFailures = false, force = false)
+      if (conf.get(WORKER_DECOMMISSION_ENABLED)) {
+        client.decommissionExecutors(executorIdsToBeRemoved)
+      } else {
+        client.killExecutors(executorIdsToBeRemoved, adjustTargetNumExecutors = false,
+          countFailures = false, force = false)
+      }
     }
 
     // [SPARK-21834] killExecutors api reduces the target number of executors.

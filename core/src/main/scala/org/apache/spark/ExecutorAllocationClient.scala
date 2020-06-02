@@ -77,6 +77,16 @@ private[spark] trait ExecutorAllocationClient {
     force: Boolean = false): Seq[String]
 
   /**
+   * Request that the cluster manager decommission the specified executors.
+   * Default implementation delegates to kill, scheduler must override
+   * if it supports graceful decommissioning.
+   *
+   * @param executorIds identifiers of executors to decommission
+   * @return the ids of the executors acknowledged by the cluster manager to be removed.
+   */
+  def decommissionExecutors(executorIds: Seq[String]): Seq[String]
+
+  /**
    * Request that the cluster manager kill every executor on the specified host.
    *
    * @return whether the request is acknowledged by the cluster manager.
