@@ -158,6 +158,13 @@ private[spark] class HostLocalDirManager(
   }
 }
 
+private[spark] trait MigratableRDDResolver {
+
+  def getMigratableRDDBlocks(): Seq[ReplicateBlock]
+
+  def migrateBlock(block: ReplicateBlock): Boolean
+}
+
 private[spark] class BlockManagerPeerProvider(
     blockManagerId: BlockManagerId,
     cachedPeersTtlMs: Int,
@@ -200,7 +207,7 @@ private[spark] class BlockManager(
     val blockTransferService: BlockTransferService,
     securityManager: SecurityManager,
     externalBlockStoreClient: Option[ExternalBlockStoreClient])
-  extends BlockDataManager with BlockEvictionHandler with Logging {
+  extends BlockDataManager with BlockEvictionHandler with MigratableRDDResolver with Logging {
 
   // same as `conf.get(config.SHUFFLE_SERVICE_ENABLED)`
   private[spark] val externalShuffleServiceEnabled: Boolean = externalBlockStoreClient.isDefined
@@ -210,6 +217,9 @@ private[spark] class BlockManager(
 
   private[spark] val subDirsPerLocalDir = conf.get(config.DISKSTORE_SUB_DIRECTORIES)
 
+  private val maxReplicationFailuresForDecommission = 
+    conf.get(config.STORAGE_DECOMMISSION_MAX_REPLICATION_FAILURE_PER_BLOCK)
+  
   val diskBlockManager = {
     // Only perform cleanup if an external service is not serving our shuffle files.
     val deleteFilesOnStop =
@@ -1829,6 +1839,25 @@ private[spark] class BlockManager(
     }
   }
 
+  override def getMigratableRDDBlocks(): Seq[ReplicateBlock] =
+    master.getReplicateInfoForRDDBlocks(blockManagerId)
+
+  override def migrateBlock(blockToReplicate: ReplicateBlock): Boolean = {
+    val replicatedSuccessfully = replicateBlock(
+      blockToReplicate.blockId,
+      blockToReplicate.replicas.toSet,
+      blockToReplicate.maxReplicas,
+      maxReplicationFailures = Some(maxReplicationFailuresForDecommission))
+    if (replicatedSuccessfully) {
+      logInfo(s"Block ${blockToReplicate.blockId} offloaded successfully, Removing block now")
+      removeBlock(blockToReplicate.blockId)
+      logInfo(s"Block ${blockToReplicate.blockId} removed")
+    } else {
+      logWarning(s"Failed to offload block ${blockToReplicate.blockId}")
+    }
+    replicatedSuccessfully
+  }
+
   private class ShuffleMigrationRunnable(peer: BlockManagerId) extends Runnable {
     @volatile var running = true
     override def run(): Unit = {
@@ -1938,7 +1967,7 @@ private[spark] class BlockManager(
    * Visible for testing
    */
   def decommissionRddCacheBlocks(): Unit = {
-    val replicateBlocksInfo = master.getReplicateInfoForRDDBlocks(blockManagerId)
+    val replicateBlocksInfo = getMigratableRDDBlocks() 
 
     if (replicateBlocksInfo.nonEmpty) {
       logInfo(s"Need to replicate ${replicateBlocksInfo.size} RDD blocks " +
@@ -1948,27 +1977,11 @@ private[spark] class BlockManager(
       return
     }
 
-    // Maximum number of storage replication failure which replicateBlock can handle
-    val maxReplicationFailures = conf.get(
-      config.STORAGE_DECOMMISSION_MAX_REPLICATION_FAILURE_PER_BLOCK)
-
     // TODO: We can sort these blocks based on some policy (LRU/blockSize etc)
     //   so that we end up prioritize them over each other
-    val blocksFailedReplication = replicateBlocksInfo.map {
-      case ReplicateBlock(blockId, existingReplicas, maxReplicas) =>
-        val replicatedSuccessfully = replicateBlock(
-          blockId,
-          existingReplicas.toSet,
-          maxReplicas,
-          maxReplicationFailures = Some(maxReplicationFailures))
-        if (replicatedSuccessfully) {
-          logInfo(s"Block $blockId offloaded successfully, Removing block now")
-          removeBlock(blockId)
-          logInfo(s"Block $blockId removed")
-        } else {
-          logWarning(s"Failed to offload block $blockId")
-        }
-        (blockId, replicatedSuccessfully)
+    val blocksFailedReplication = replicateBlocksInfo.map { replicateBlock =>
+        val replicatedSuccessfully = migrateBlock(replicateBlock) 
+        (replicateBlock.blockId, replicatedSuccessfully)
     }.filterNot(_._2).map(_._1)
     if (blocksFailedReplication.nonEmpty) {
       logWarning("Blocks failed replication in cache decommissioning " +
