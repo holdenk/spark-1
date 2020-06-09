@@ -42,12 +42,6 @@ private[storage] class BlockManagerDecommissionManager(
     migratableShuffleBlockResolver: MigratableResolver,
     peerProvider: BlockManagerPeerProvider) extends Logging {
 
-  // Shuffles which are either in queue for migrations or migrated
-  private val migratingShuffles = mutable.HashSet[(Int, Long)]()
-
-  // Shuffles which are queued for migration
-  private val shufflesToMigrate = new java.util.concurrent.ConcurrentLinkedQueue[(Int, Long)]()
-
   private class ShuffleMigrationRunnable(peer: BlockManagerId) extends Runnable {
     @volatile var running = true
     override def run(): Unit = {
@@ -90,8 +84,7 @@ private[storage] class BlockManagerDecommissionManager(
         case e: Exception =>
           migrating match {
             case Some(shuffleMap) =>
-              logError(s"Error ${e} during migration, " +
-                s"adding ${shuffleMap} back to migration queue")
+              logError(s"Error ${e} during migration, adding ${shuffleMap} back to migration queue")
               shufflesToMigrate.add(shuffleMap)
             case None =>
               logError(s"Error ${e} while waiting for block to migrate")
@@ -99,6 +92,13 @@ private[storage] class BlockManagerDecommissionManager(
       }
     }
   }
+
+  // Shuffles which are either in queue for migrations or migrated
+  private val migratingShuffles = mutable.HashSet[(Int, Long)]()
+
+  // Shuffles which are queued for migration
+  private[storage] val shufflesToMigrate =
+    new java.util.concurrent.ConcurrentLinkedQueue[(Int, Long)]()
 
   @volatile private var stopped = false
 
@@ -108,91 +108,12 @@ private[storage] class BlockManagerDecommissionManager(
   private lazy val blockMigrationExecutor =
     ThreadUtils.newDaemonSingleThreadExecutor("block-manager-decommission")
 
-  /**
-   * Tries to offload all shuffle blocks that are registered with the shuffle service locally.
-   * Note: this does not delete the shuffle files in-case there is an in-progress fetch
-   * but rather shadows them.
-   * Requires an Indexed based shuffle resolver.
-   * Note: if called in testing please call stopOffloadingShuffleBlocks to avoid thread leakage.
-   */
-  def offloadShuffleBlocks(): Unit = {
-    // Update the queue of shuffles to be migrated
-    logInfo("Offloading shuffle blocks")
-    val localShuffles = migratableShuffleBlockResolver.getStoredShuffles()
-    val newShufflesToMigrate = localShuffles.&~(migratingShuffles).toSeq
-    shufflesToMigrate.addAll(newShufflesToMigrate.asJava)
-    migratingShuffles ++= newShufflesToMigrate
-
-    // Update the threads doing migrations
-    // TODO: Sort & only start as many threads as min(||blocks||, ||targets||) using location pref
-    val livePeerSet = peerProvider.getPeers(false).toSet
-    val currentPeerSet = migrationPeers.keys.toSet
-    val deadPeers = currentPeerSet.&~(livePeerSet)
-    val newPeers = livePeerSet.&~(currentPeerSet)
-    migrationPeers ++= newPeers.map { peer =>
-      logDebug(s"Starting thread to migrate shuffle blocks to ${peer}")
-      val executor = ThreadUtils.newDaemonSingleThreadExecutor(s"migrate-shuffle-to-${peer}")
-      val runnable = new ShuffleMigrationRunnable(peer)
-      executor.submit(runnable)
-      (peer, (runnable, executor))
-    }
-    // A peer may have entered a decommissioning state, don't transfer any new blocks
-    deadPeers.foreach { peer =>
-        migrationPeers.get(peer).foreach(_._1.running = false)
-    }
-  }
-
-
-  /**
-   * Stop migrating shuffle blocks.
-   */
-  def stopOffloadingShuffleBlocks(): Unit = {
-    logInfo("Stopping offloading shuffle blocks.")
-    // Stop as gracefully as possible.
-    migrationPeers.values.foreach{case (runnable, service) =>
-      runnable.running = false}
-    migrationPeers.values.foreach{case (runnable, service) =>
-      service.shutdown()}
-    migrationPeers.values.foreach{case (runnable, service) =>
-      service.shutdownNow()}
-  }
-
-  /**
-   * Tries to offload all cached RDD blocks from this BlockManager to peer BlockManagers
-   * Visible for testing
-   */
-  def decommissionRddCacheBlocks(): Unit = {
-    val replicateBlocksInfo = migratableRDDResolver.getMigratableRDDBlocks()
-
-    if (replicateBlocksInfo.nonEmpty) {
-      logInfo(s"Need to replicate ${replicateBlocksInfo.size} RDD blocks " +
-        "for block manager decommissioning")
-    } else {
-      logWarning(s"Asked to decommission RDD cache blocks, but no blocks to migrate")
-      return
-    }
-
-    // TODO: We can sort these blocks based on some policy (LRU/blockSize etc)
-    //   so that we end up prioritize them over each other
-    val blocksFailedReplication = replicateBlocksInfo.map { replicateBlock =>
-        val replicatedSuccessfully = migratableRDDResolver.migrateBlock(replicateBlock)
-        (replicateBlock.blockId, replicatedSuccessfully)
-    }.filterNot(_._2).map(_._1)
-    if (blocksFailedReplication.nonEmpty) {
-      logWarning("Blocks failed replication in cache decommissioning " +
-        s"process: ${blocksFailedReplication.mkString(",")}")
-    }
-  }
-
   private val blockMigrationRunnable = new Runnable {
-    val sleepInterval = conf.get(
-      config.STORAGE_DECOMMISSION_REPLICATION_REATTEMPT_INTERVAL)
+    val sleepInterval = conf.get(config.STORAGE_DECOMMISSION_REPLICATION_REATTEMPT_INTERVAL)
 
     override def run(): Unit = {
       var failures = 0
-      while (!stopped
-        && !Thread.interrupted()
-        && failures < 20) {
+      while (!stopped && !Thread.interrupted() && failures < 20) {
         logInfo("Iterating on migrating from the block manager.")
         try {
           // If enabled we migrate shuffle blocks first as they are more expensive.
@@ -224,6 +145,81 @@ private[storage] class BlockManagerDecommissionManager(
               s" for block manager decommissioning (failure count: $failures)", e)
         }
       }
+    }
+  }
+
+  /**
+   * Tries to offload all shuffle blocks that are registered with the shuffle service locally.
+   * Note: this does not delete the shuffle files in-case there is an in-progress fetch
+   * but rather shadows them.
+   * Requires an Indexed based shuffle resolver.
+   * Note: if called in testing please call stopOffloadingShuffleBlocks to avoid thread leakage.
+   */
+  private[storage] def offloadShuffleBlocks(): Unit = {
+    // Update the queue of shuffles to be migrated
+    logInfo("Offloading shuffle blocks")
+    val localShuffles = migratableShuffleBlockResolver.getStoredShuffles()
+    val newShufflesToMigrate = localShuffles.&~(migratingShuffles).toSeq
+    shufflesToMigrate.addAll(newShufflesToMigrate.asJava)
+    migratingShuffles ++= newShufflesToMigrate
+
+    // Update the threads doing migrations
+    // TODO: Sort & only start as many threads as min(||blocks||, ||targets||) using location pref
+    val livePeerSet = peerProvider.getPeers(false).toSet
+    val currentPeerSet = migrationPeers.keys.toSet
+    val deadPeers = currentPeerSet.&~(livePeerSet)
+    val newPeers = livePeerSet.&~(currentPeerSet)
+    migrationPeers ++= newPeers.map { peer =>
+      logDebug(s"Starting thread to migrate shuffle blocks to ${peer}")
+      val executor = ThreadUtils.newDaemonSingleThreadExecutor(s"migrate-shuffle-to-${peer}")
+      val runnable = new ShuffleMigrationRunnable(peer)
+      executor.submit(runnable)
+      (peer, (runnable, executor))
+    }
+    // A peer may have entered a decommissioning state, don't transfer any new blocks
+    deadPeers.foreach { peer =>
+        migrationPeers.get(peer).foreach(_._1.running = false)
+    }
+  }
+
+  /**
+   * Stop migrating shuffle blocks.
+   */
+  private[storage] def stopOffloadingShuffleBlocks(): Unit = {
+    logInfo("Stopping offloading shuffle blocks.")
+    // Stop as gracefully as possible.
+    migrationPeers.values.foreach{case (runnable, service) =>
+      runnable.running = false}
+    migrationPeers.values.foreach{case (runnable, service) =>
+      service.shutdown()}
+    migrationPeers.values.foreach{case (runnable, service) =>
+      service.shutdownNow()}
+  }
+
+  /**
+   * Tries to offload all cached RDD blocks from this BlockManager to peer BlockManagers
+   * Visible for testing
+   */
+  private[storage] def decommissionRddCacheBlocks(): Unit = {
+    val replicateBlocksInfo = migratableRDDResolver.getMigratableRDDBlocks()
+
+    if (replicateBlocksInfo.nonEmpty) {
+      logInfo(s"Need to replicate ${replicateBlocksInfo.size} RDD blocks " +
+        "for block manager decommissioning")
+    } else {
+      logWarning(s"Asked to decommission RDD cache blocks, but no blocks to migrate")
+      return
+    }
+
+    // TODO: We can sort these blocks based on some policy (LRU/blockSize etc)
+    //   so that we end up prioritize them over each other
+    val blocksFailedReplication = replicateBlocksInfo.map { replicateBlock =>
+        val replicatedSuccessfully = migratableRDDResolver.migrateBlock(replicateBlock)
+        (replicateBlock.blockId, replicatedSuccessfully)
+    }.filterNot(_._2).map(_._1)
+    if (blocksFailedReplication.nonEmpty) {
+      logWarning("Blocks failed replication in cache decommissioning " +
+        s"process: ${blocksFailedReplication.mkString(",")}")
     }
   }
 
