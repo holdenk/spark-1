@@ -158,6 +158,30 @@ private[spark] class HostLocalDirManager(
   }
 }
 
+private[spark] class BlockManagerPeerProvider(
+    blockManagerId: BlockManagerId,
+    cachedPeersTtlMs: Int,
+    master: BlockManagerMaster) extends Logging {
+
+  // Field related to peer block managers that are necessary for block replication
+  @volatile private var cachedPeers: Seq[BlockManagerId] = _
+  private var lastPeerFetchTimeNs = 0L
+
+  /**
+   * Get peer block managers in the system.
+   */
+  def getPeers(forceFetch: Boolean): Seq[BlockManagerId] = synchronized {
+    val diff = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - lastPeerFetchTimeNs)
+    val timeout = diff > cachedPeersTtlMs
+    if (cachedPeers == null || forceFetch || timeout) {
+      cachedPeers = master.getPeers(blockManagerId).sortBy(_.hashCode)
+      lastPeerFetchTimeNs = System.nanoTime()
+      logDebug("Fetched peers from master: " + cachedPeers.mkString("[", ",", "]"))
+    }
+    cachedPeers
+  }
+}
+
 /**
  * Manager running on every node (driver and executors) which provides interfaces for putting and
  * retrieving blocks both locally and remotely into various stores (memory, disk, and off-heap).
@@ -237,10 +261,7 @@ private[spark] class BlockManager(
   private var asyncReregisterTask: Future[Unit] = null
   private val asyncReregisterLock = new Object
 
-  // Field related to peer block managers that are necessary for block replication
-  @volatile private var cachedPeers: Seq[BlockManagerId] = _
-  private val peerFetchLock = new Object
-  private var lastPeerFetchTimeNs = 0L
+  private[storage] var peerProvider: BlockManagerPeerProvider = _
 
   private var blockReplicationPolicy: BlockReplicationPolicy = _
 
@@ -486,6 +507,9 @@ private[spark] class BlockManager(
     } else {
       blockManagerId
     }
+
+    peerProvider = new BlockManagerPeerProvider(blockManagerId,
+      conf.get(config.STORAGE_CACHED_PEERS_TTL), master)
 
     // Register Executors' configuration with the local shuffle service, if one should exist.
     if (externalShuffleServiceEnabled && !blockManagerId.isDriver) {
@@ -1570,23 +1594,6 @@ private[spark] class BlockManager(
   }
 
   /**
-   * Get peer block managers in the system.
-   */
-  private def getPeers(forceFetch: Boolean): Seq[BlockManagerId] = {
-    peerFetchLock.synchronized {
-      val cachedPeersTtl = conf.get(config.STORAGE_CACHED_PEERS_TTL) // milliseconds
-      val diff = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - lastPeerFetchTimeNs)
-      val timeout = diff > cachedPeersTtl
-      if (cachedPeers == null || forceFetch || timeout) {
-        cachedPeers = master.getPeers(blockManagerId).sortBy(_.hashCode)
-        lastPeerFetchTimeNs = System.nanoTime()
-        logDebug("Fetched peers from master: " + cachedPeers.mkString("[", ",", "]"))
-      }
-      cachedPeers
-    }
-  }
-
-  /**
    * Replicates a block to peer block managers based on existingReplicas and maxReplicas
    *
    * @param blockId blockId being replicate
@@ -1613,7 +1620,7 @@ private[spark] class BlockManager(
       // we know we are called as a result of an executor removal or because the current executor
       // is getting decommissioned. so we refresh peer cache before trying replication, we won't
       // try to replicate to a missing executor/another decommissioning executor
-      getPeers(forceFetch = true)
+      peerProvider.getPeers(forceFetch = true)
       try {
         replicate(
           blockId, data, storageLevel, info.classTag, existingReplicas, maxReplicationFailures)
@@ -1652,7 +1659,7 @@ private[spark] class BlockManager(
     val peersFailedToReplicateTo = mutable.HashSet.empty[BlockManagerId]
     var numFailures = 0
 
-    val initialPeers = getPeers(false).filterNot(existingReplicas.contains)
+    val initialPeers = peerProvider.getPeers(false).filterNot(existingReplicas.contains)
 
     var peersForReplication = blockReplicationPolicy.prioritize(
       blockManagerId,
@@ -1695,7 +1702,7 @@ private[spark] class BlockManager(
           // we have a failed replication, so we get the list of peers again
           // we don't want peers we have already replicated to and the ones that
           // have failed previously
-          val filteredPeers = getPeers(true).filter { p =>
+          val filteredPeers = peerProvider.getPeers(true).filter { p =>
             !peersFailedToReplicateTo.contains(p) && !peersReplicatedTo.contains(p)
           }
 
@@ -1894,7 +1901,7 @@ private[spark] class BlockManager(
 
     // Update the threads doing migrations
     // TODO: Sort & only start as many threads as min(||blocks||, ||targets||) using location pref
-    val livePeerSet = getPeers(false).toSet
+    val livePeerSet = peerProvider.getPeers(false).toSet
     val currentPeerSet = migrationPeers.keys.toSet
     val deadPeers = currentPeerSet.&~(livePeerSet)
     val newPeers = livePeerSet.&~(currentPeerSet)
