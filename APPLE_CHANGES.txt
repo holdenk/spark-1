@@ -1,0 +1,53 @@
+This contains the changes after creating `v3.0.0`
+
+# From Spark 3.1.0
+SPARK-31208      Add an expiremental cleanShuffleDependencies
+SPARK-31394      Adds support for Kubernetes NFS volume mounts
+SPARK-31394      Add nfs volume type description
+SPARK-31464      Upgrade Kafka to 2.5.0
+SPARK-31073      Add "shuffle write time" to task metrics summary in StagePage
+SPARK-20628      Start to improve Spark decommissioning & preemption support
+SPARK-20732      Decommission cache blocks to other executors when an executor is decommissioned
+SPARK-31011      Log better message if SIGPWR is not supported while setting up decommission
+SPARK-31239      Increase await duration in `WorkerDecommissionSuite`.`verify a task with all workers decommissioned succeeds`
+SPARK-31360      Fix hung-up issue in StagePage
+SPARK-31791      Improve cache block migration test reliability
+SPARK-31062      Improve spark decommissioning k8s test reliability
+SPARK-31047      Improve file listing for ViewFileSystem
+SPARK-25355      Add proxy user to driver if present on spark-submit
+SPARK-29089      Parallelize blocking FileSystem calls in DataSource#checkAndGlobPathIfNecessary
+SPARK-29905      Improve pod lifecycle manager behavior with dynamic allocation
+SPARK-30385      WebUI occasionally throw IOException on stop()
+SPARK-30772      avoid tuple assignment because it will circumvent the transient tag
+SPARK-30786      Fix Block replication failure propogation issue in BlockManager
+SPARK-30856      Fix SQLContext.getOrCreate() when SparkContext is restarted
+SPARK-31041      Show Maven errors from within make-distribution.sh
+SPARK-31071      Allow annotating non-null fields when encoding Java Beans
+SPARK-31120      Support enabling maven profiles for importing vi…
+SPARK-31125      Terminating pods have a deletion timestamp but they are not yet dead
+
+# From Spark 3.0.1
+MINOR            fileNameOnly parameter description re-unite
+SPARK-31849      Deduplicate and reuse Utils.exceptionString in Python exception handling
+SPARK-31923      Ignore internal accumulators that use unrecognized types rather than crashing
+SPARK-31934      Remove set -x from docker image tool
+SPARK-31849      More correct error message in Python UDF exception message
+SPARK-28199      Mention the change of into the SS migration guide
+SPARK-31932      Add date/timestamp benchmarks for `HiveResult.hiveResultString()`
+SPARK-31940      Document the default JVM time zone in to/fromJavaDate and legacy date formatters
+SPARK-29295      Dynamic partition map parsed from partition path should be case insensitive
+SPARK-31220      repartition obeys initialPartitionNum when adaptiveExecutionEnabled
+SPARK-31921      Fix the wrong warning: "App app-xxx requires more resource than any of Workers could have"
+SPARK-31926      Fix concurrency issue for ThriftCLIService to getPortNumber
+
+# Internal Patches
+SPARK-17767      Support user-provided ExternalCatalog and SessionBuilder
+MINOR            Add JDK11 options
+MINOR            Adjust test cases for RIO
+MINOR            Support JarvisSparkHadoopUtil
+MINOR            Added bindAddress in Mesos Executor Backend for now set to local host name
+MINOR            SparkUI patch
+MINOR            Use abstract storage as a replacement for window.localStorage
+MINOR            Use Utils.localHostName() for bindAddress
+MINOR            Integrate ACI spark call home service listener v0.1.1
+MINOR            Add rio.yml and dev scripts
