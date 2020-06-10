@@ -36,6 +36,8 @@ package object config {
   private[spark] val SPARK_EXECUTOR_PREFIX = "spark.executor"
   private[spark] val SPARK_TASK_PREFIX = "spark.task"
   private[spark] val LISTENER_BUS_EVENT_QUEUE_PREFIX = "spark.scheduler.listenerbus.eventqueue"
+  private[spark] val SPARK_CALL_HOME_LISTENER_CLASS =
+    "com.apple.aci.data.spark.callhome.listener.v1.SparkCallHomeListenerV1"
 
   private[spark] val RESOURCES_DISCOVERY_PLUGIN =
     ConfigBuilder("spark.resources.discoveryPlugin")
@@ -1842,4 +1844,8 @@ package object config {
     .bytesConf(ByteUnit.BYTE)
     .createOptional
 
+  private[spark] val SPARK_CALL_HOME_ENABLED =
+    ConfigBuilder("spark.aci.callhome.enabled")
+      .booleanConf
+      .createWithDefault(false)
 }
