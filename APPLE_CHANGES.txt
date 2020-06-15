@@ -38,7 +38,27 @@ SPARK-31940      Document the default JVM time zone in to/fromJavaDate and legac
 SPARK-29295      Dynamic partition map parsed from partition path should be case insensitive
 SPARK-31220      repartition obeys initialPartitionNum when adaptiveExecutionEnabled
 SPARK-31921      Fix the wrong warning: "App app-xxx requires more resource than any of Workers could have"
-SPARK-31926      Fix concurrency issue for ThriftCLIService to getPortNumber
+SPARK-26905      Add `TYPE` in the ANSI non-reserved list
+SPARK-31941      Replace SparkException to NoSuchElementException for applicationInfo in AppStatusStore
+SPARK-31956      Do not fail if there is no ambiguous self join
+SPARK-31915      Resolve the grouping column properly per the case sensitivity in grouped and cogrouped pandas UDFs
+SPARK-31965      Move doctests related to Java function registration to test conditionally
+SPARK-28199      Remove package private in class/object in sql.execution package
+SPARK-31966      Increase the timeout for StreamingLogisticRegressionWithSGDTests.test_training_and_prediction
+SPARK-31958      normalize special floating numbers in subquery
+SPARK-31954      Delete duplicate testcase in HiveQuerySuite
+SPARK-31935      Hadoop file system config should be effective in data source options
+SPARK-31916      StringConcat can lead to StringIndexOutOfBoundsException
+SPARK-31939      Fix Parsing day of year when year field pattern is missing
+MINOR            Revert SPARK-31860 only push release tags on succes
+SPARK-31979      Release script should not fail when remove non-existing files
+SPARK-31967      Downgrade to vis.js 4.21.0 to fix Jobs UI loading time regression
+SPARK-31644      Make Spark's guava version configurable from the command line for sbt
+SPARK-31632      Enrich the exception message when application summary is unavailable
+SPARK-31968      Duplicate partition columns check when writing data
+SPARK-31593      Remove unnecessary streaming query progress update
+SPARK-31983      Fix sorting for duration column in structured streaming tab
+SPARK-31990      Use toSet.toSeq in Dataset.dropDuplicates
 
 # Internal Patches
 SPARK-17767      Support user-provided ExternalCatalog and SessionBuilder
@@ -51,3 +71,4 @@ MINOR            Use abstract storage as a replacement for window.localStorage
 MINOR            Use Utils.localHostName() for bindAddress
 MINOR            Integrate ACI spark call home service listener v0.1.1
 MINOR            Add rio.yml and dev scripts
+MINOR            Bump to 3.0.0.2-apple-SNAPSHOT
