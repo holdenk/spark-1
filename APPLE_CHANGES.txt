@@ -61,6 +61,8 @@ SPARK-31983      Fix sorting for duration column in structured streaming tab
 SPARK-31990      Use toSet.toSeq in Dataset.dropDuplicates
 
 # Internal Patches
+COMBO            A preview of SPARK-20629, SPARK-31197 & SPARK-31198 to add shuffle block migration to dynamic scaling.
+MINOR            Script for helping us handle patches
 SPARK-17767      Support user-provided ExternalCatalog and SessionBuilder
 MINOR            Add JDK11 options
 MINOR            Adjust test cases for RIO
