@@ -430,7 +430,8 @@ private[spark] class ExecutorAllocationManager(
     val executorIdsToBeRemoved = new ArrayBuffer[String]
 
     logDebug(s"Request to remove executorIds: ${executors.mkString(", ")}")
-    val numExistingExecutors = executorMonitor.executorCount - executorMonitor.pendingRemovalCount
+    val numExistingExecutors = (executorMonitor.executorCount
+      - executorMonitor.pendingRemovalCount - executorMonitor.pendingDecommissioningCount)
 
     var newExecutorTotal = numExistingExecutors
     executors.foreach { executorIdToBeRemoved =>
@@ -457,7 +458,7 @@ private[spark] class ExecutorAllocationManager(
       // We don't want to change our target number of executors, because we already did that
       // when the task backlog decreased.
       if (conf.get(WORKER_DECOMMISSION_ENABLED)) {
-        client.decommissionExecutors(executorIdsToBeRemoved)
+        client.decommissionExecutors(executorIdsToBeRemoved, adjustTargetNumExecutors = false)
       } else {
         client.killExecutors(executorIdsToBeRemoved, adjustTargetNumExecutors = false,
           countFailures = false, force = false)
@@ -471,7 +472,11 @@ private[spark] class ExecutorAllocationManager(
     newExecutorTotal = numExistingExecutors
     if (testing || executorsRemoved.nonEmpty) {
       newExecutorTotal -= executorsRemoved.size
-      executorMonitor.executorsKilled(executorsRemoved)
+      if (conf.get(WORKER_DECOMMISSION_ENABLED)) {
+        executorMonitor.executorsDecommissioned(executorsRemoved)
+      } else {
+        executorMonitor.executorsKilled(executorsRemoved)
+      }
       logInfo(s"Executors ${executorsRemoved.mkString(",")} removed due to idle timeout." +
         s"(new desired total will be $newExecutorTotal)")
       executorsRemoved
