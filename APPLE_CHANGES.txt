@@ -28,6 +28,14 @@ SPARK-31120      Support enabling maven profiles for importing vi…
 SPARK-31125      Terminating pods have a deletion timestamp but they are not yet dead
 
 # From Spark 3.0.1
+SPARK-32020	 Better error message when SPARK_HOME or spark.test.home is not set
+SPARK-32000	 Fix the flaky test for partially launched task in barrier-mode
+SPARK-32011	 Remove warnings about pin-thread modes and guide to use collectWithJobGroup
+SPARK-31997	 Drop test_udtf table when SingleSessionSuite test completed
+SPARK-31986	 Fix Julian-Gregorian micros rebasing of overlapping local timestamps
+SPARK-31959	 Fix Gregorian-Julian micros rebasing while switching standard time zone offset
+SPARK-31994	 Docker image should use `https` urls for only deb.debian.org mirrors
+SPARK-31950	 Extract SQL keywords from the SqlBase.g4 fil
 MINOR            fileNameOnly parameter description re-unite
 SPARK-31849      Deduplicate and reuse Utils.exceptionString in Python exception handling
 SPARK-31923      Ignore internal accumulators that use unrecognized types rather than crashing
