@@ -1,6 +1,7 @@
 This contains the changes after creating `v3.0.0`
 
 # From Spark 3.1.0
+SPARK-31960      Only populate Hadoop classpath for no-hadoop by default
 SPARK-31208      Add an expiremental cleanShuffleDependencies
 SPARK-31394      Adds support for Kubernetes NFS volume mounts
 SPARK-31394      Add nfs volume type description
