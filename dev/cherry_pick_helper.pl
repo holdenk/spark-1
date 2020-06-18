@@ -66,7 +66,7 @@ COMMIT: foreach my $i (0..$#commits_desc) {
     while (my $input = <>) {
 	chomp($input);
 	if ($input eq 'y') {
-	    $new_changes = "$new_changes\n$jira\t $desc";
+	    $new_changes = "$jira\t $desc\n$new_changes";
 	    my $merge_result = system("git cherry-pick $commit");
 	    print "Result:\n$merge_result";
 	    if ($merge_result != 0) {
