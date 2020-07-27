@@ -1220,7 +1220,8 @@ private[spark] class BlockManager(
         // Need to compute the block.
     }
     // Initially we hold no locks on this block.
-    doPutIterator(blockId, makeIterator, level, classTag, keepReadLock = true) match {
+    doPutIterator(blockId, makeIterator, level, classTag, keepReadLock = true,
+      localCompute = true) match {
       case None =>
         // doPut() didn't hand work back to us, so the block already existed or was successfully
         // stored. Therefore, we now hold a read lock on the block.
@@ -1310,11 +1311,17 @@ private[spark] class BlockManager(
       level: StorageLevel,
       classTag: ClassTag[_],
       tellMaster: Boolean,
-      keepReadLock: Boolean)(putBody: BlockInfo => Option[T]): Option[T] = {
+      keepReadLock: Boolean,
+      localCompute: Boolean = false)(putBody: BlockInfo => Option[T]): Option[T] = {
 
     require(blockId != null, "BlockId is null")
     require(level != null && level.isValid, "StorageLevel is null or invalid")
-    if (isDecommissioning()) {
+    // Allow blocks to be put by local computation. This is only really needed in testing since
+    // doPut is called before the iterator (e.g. any useful work) starts being computed.
+    // but to make our tests reliable we want to avoid the race condition where
+    // the task has started, then the worker is decommissioned, and then the iterator
+    // starts being computed.
+    if (!localCompute && isDecommissioning()) {
       throw new BlockSavedOnDecommissionedBlockManagerException(blockId)
     }
 
@@ -1398,8 +1405,10 @@ private[spark] class BlockManager(
       level: StorageLevel,
       classTag: ClassTag[T],
       tellMaster: Boolean = true,
-      keepReadLock: Boolean = false): Option[PartiallyUnrolledIterator[T]] = {
-    doPut(blockId, level, classTag, tellMaster = tellMaster, keepReadLock = keepReadLock) { info =>
+      keepReadLock: Boolean = false,
+      localCompute: Boolean = false): Option[PartiallyUnrolledIterator[T]] = {
+    doPut(blockId, level, classTag, tellMaster = tellMaster,
+      keepReadLock = keepReadLock, localCompute = localCompute) { info =>
       val startTimeNs = System.nanoTime()
       var iteratorFromFailedMemoryStorePut: Option[PartiallyUnrolledIterator[T]] = None
       // Size of the block in bytes
