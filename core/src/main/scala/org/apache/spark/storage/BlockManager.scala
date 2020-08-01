@@ -1823,11 +1823,11 @@ private[spark] class BlockManager(
   }
 
   /*
-   *  Returns the last migration time and a boolean denoting if all the blocks have been migrated.
+   *  Returns a boolean indicating if all the blocks have been migrated.
    *  If there are any tasks running since that time the boolean may be incorrect.
    */
-  private[spark] def lastMigrationInfo(): (Long, Boolean) = {
-    decommissioner.map(_.lastMigrationInfo()).getOrElse((0, false))
+  private[spark] def migrationFinished(): Boolean = {
+    decommissioner.map(_.migrationFinished).getOrElse(true)
   }
 
   private[storage] def getMigratableRDDBlocks(): Seq[ReplicateBlock] =

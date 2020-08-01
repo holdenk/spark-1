@@ -292,38 +292,23 @@ private[spark] class CoarseGrainedExecutorBackend(
 
       val shutdownThread = new Thread("wait-for-blocks-to-migrate") {
         override def run(): Unit = {
-          var lastTaskRunningTime = System.nanoTime()
           val sleep_time = 1000 // 1s
 
-          while (true) {
-            logInfo("Checking to see if we can shutdown.")
+          if (executor != null) {
+            // giving time to process the DecommissionExecutor for the driver
             Thread.sleep(sleep_time)
-            if (executor == null || executor.numRunningTasks == 0) {
-              if (env.conf.get(STORAGE_DECOMMISSION_ENABLED)) {
-                logInfo("No running tasks, checking migrations")
-                val (migrationTime, allBlocksMigrated) = env.blockManager.lastMigrationInfo()
-                // We can only trust allBlocksMigrated boolean value if there were no tasks running
-                // since the start of computing it.
-                if (allBlocksMigrated && (migrationTime > lastTaskRunningTime)) {
-                  logInfo("No running tasks, all blocks migrated, stopping.")
-                  exitExecutor(0, "Finished decommissioning", notifyDriver = true)
-                } else {
-                  logInfo("All blocks not yet migrated.")
-                }
-              } else {
-                logInfo("No running tasks, no block migration configured, stopping.")
-                exitExecutor(0, "Finished decommissioning", notifyDriver = true)
-              }
-            } else {
+            while (executor.numRunningTasks != 0) {
               logInfo("Blocked from shutdown by running ${executor.numRunningtasks} tasks")
-              // If there is a running task it could store blocks, so make sure we wait for a
-              // migration loop to complete after the last task is done.
-              // Note: this is only advanced if there is a running task, if there
-              // is no running task but the blocks are not done migrating this does not
-              // move forward.
-              lastTaskRunningTime = System.nanoTime()
+              Thread.sleep(sleep_time)
+            }
+            logInfo("No running tasks, checking migrations")
+            while (!env.blockManager.migrationFinished) {
+              logInfo("All blocks not yet migrated.")
+              Thread.sleep(sleep_time)
             }
           }
+          logInfo("No running tasks, migration finished or not configured, stopping.")
+          exitExecutor(0, "Finished decommissioning", notifyDriver = true)
         }
       }
       shutdownThread.setDaemon(true)
