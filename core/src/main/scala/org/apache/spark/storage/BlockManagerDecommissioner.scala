@@ -43,8 +43,6 @@ private[storage] class BlockManagerDecommissioner(
     conf.get(config.STORAGE_DECOMMISSION_MAX_REPLICATION_FAILURE_PER_BLOCK)
 
   // Used for tracking if our migrations are complete.
-  @volatile private var lastRDDMigrationTime: Long = 0
-  @volatile private var lastShuffleMigrationTime: Long = 0
   @volatile private var rddBlocksLeft: Boolean = true
   @volatile private var shuffleBlocksLeft: Boolean = true
 
@@ -156,7 +154,6 @@ private[storage] class BlockManagerDecommissioner(
           val startTime = System.nanoTime()
           logDebug("Attempting to replicate all cached RDD blocks")
           rddBlocksLeft = decommissionRddCacheBlocks()
-          lastRDDMigrationTime = startTime
           logInfo("Attempt to replicate all cached blocks done")
           logInfo(s"Waiting for ${sleepInterval} before refreshing migrations.")
           Thread.sleep(sleepInterval)
@@ -186,7 +183,6 @@ private[storage] class BlockManagerDecommissioner(
           logDebug("Attempting to replicate all shuffle blocks")
           val startTime = System.nanoTime()
           shuffleBlocksLeft = refreshOffloadingShuffleBlocks()
-          lastShuffleMigrationTime = startTime
           logInfo("Done starting workers to migrate shuffle blocks")
           Thread.sleep(sleepInterval)
         } catch {
